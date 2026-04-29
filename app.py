@@ -5,12 +5,11 @@ from datetime import datetime
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import sqlite3
-import google.generativeai as genai
+from google import genai
 
 app = Flask(__name__)
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-2.0-flash")
+gemini_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 DB_PATH = "/tmp/cashflow.db"
 
@@ -91,32 +90,35 @@ Ao receber uma mensagem, identifique a intenção e responda APENAS em JSON com 
 }
 
 Regras:
-- "uber 27", "mercado 150", "almoço 35,90" → gasto
-- "relatório", "resumo", "quanto gastei" → relatorio
+- "uber 27", "mercado 150", "almoco 35,90" → gasto
+- "relatorio", "resumo", "quanto gastei" → relatorio
 - "limite 2000" → limite
 - "oi", "ajuda", "help" → ajuda
-- Se não conseguir extrair o valor, coloque 0 e peça na resposta
+- Se nao conseguir extrair o valor, coloque 0 e peca na resposta
 - Use emojis e linguagem brasileira informal
 - Responda SOMENTE o JSON, sem texto fora dele, sem backticks
 """
 
 def processar_com_ia(mensagem):
-    response = model.generate_content(SYSTEM_PROMPT + "\n\nMensagem do usuário: " + mensagem)
+    response = gemini_client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=SYSTEM_PROMPT + "\n\nMensagem do usuario: " + mensagem
+    )
     texto = response.text.strip()
     texto = re.sub(r"```json|```", "", texto).strip()
     return json.loads(texto)
 
-# ─── RELATÓRIO ─────────────────────────────────────────────────────────────────
+# ─── RELATORIO ─────────────────────────────────────────────────────────────────
 
 def gerar_relatorio(telefone):
     mes = datetime.now().month
     ano = datetime.now().year
     gastos = buscar_gastos_mes(telefone)
-    meses_nome = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+    meses_nome = ["Janeiro","Fevereiro","Marco","Abril","Maio","Junho",
                   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
     if not gastos:
-        return f"Nenhum gasto registrado em {meses_nome[mes-1]}/{ano}. Começa mandando um gasto! 🐷"
+        return f"Nenhum gasto registrado em {meses_nome[mes-1]}/{ano}. Comeca mandando um gasto! 🐷"
 
     categorias = {}
     for desc, valor, cat in gastos:
@@ -126,7 +128,7 @@ def gerar_relatorio(telefone):
     emojis = {"alimentacao":"🍔","transporte":"🚗","lazer":"🎮","saude":"💊",
               "moradia":"🏠","educacao":"📚","roupas":"👕","outros":"📦"}
 
-    linhas = [f"📊 *Relatório - {meses_nome[mes-1]}/{ano}*\n"]
+    linhas = [f"📊 *Relatorio - {meses_nome[mes-1]}/{ano}*\n"]
     for cat, itens in sorted(categorias.items(), key=lambda x: -sum(i[1] for i in x[1])):
         subtotal = sum(i[1] for i in itens)
         linhas.append(f"{emojis.get(cat,'📦')} *{cat.capitalize()}* → R$ {subtotal:.2f}")
@@ -171,10 +173,10 @@ def webhook():
                 limite = buscar_limite(telefone)
                 alerta = ""
                 if limite > 0 and total_mes >= limite * 0.9:
-                    alerta = f"\n\n⚠️ Você já gastou R$ {total_mes:.2f} do limite de R$ {limite:.2f}!"
+                    alerta = f"\n\n⚠️ Voce ja gastou R$ {total_mes:.2f} do limite de R$ {limite:.2f}!"
                 resp.message(resultado.get("resposta", f"✅ {descricao}: R$ {valor:.2f} anotado!") + alerta)
             else:
-                resp.message("Não consegui identificar o valor. Me diz assim: *mercado 85,50* 😊")
+                resp.message("Nao consegui identificar o valor. Me diz assim: *mercado 85,50* 😊")
 
         elif intencao == "relatorio":
             resp.message(gerar_relatorio(telefone))
@@ -189,15 +191,15 @@ def webhook():
 
         elif intencao == "ajuda":
             resp.message(
-                "👋 Olá! Sou o *CashFlow AI*!\n\n"
-                "É simples assim:\n\n"
-                "💬 *Registrar gasto:*\n_uber 27_ ou _almoço 35,90_\n\n"
-                "📊 *Ver relatório:*\n_relatório_ ou _resumo_\n\n"
+                "👋 Ola! Sou o *CashFlow AI*!\n\n"
+                "E simples assim:\n\n"
+                "💬 *Registrar gasto:*\n_uber 27_ ou _almoco 35,90_\n\n"
+                "📊 *Ver relatorio:*\n_relatorio_ ou _resumo_\n\n"
                 "⚠️ *Definir limite mensal:*\n_limite 2000_\n\n"
                 "Me conta um gasto de hoje! 😄"
             )
         else:
-            resp.message(resultado.get("resposta", "Não entendi 😅 Tenta: _mercado 50_ ou manda _ajuda_"))
+            resp.message(resultado.get("resposta", "Nao entendi 😅 Tenta: _mercado 50_ ou manda _ajuda_"))
 
     except Exception as e:
         print(f"Erro: {e}")
