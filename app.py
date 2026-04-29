@@ -4,12 +4,13 @@ import re
 from datetime import datetime
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-import anthropic
 import sqlite3
+import google.generativeai as genai
 
 app = Flask(__name__)
 
-anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 DB_PATH = "/tmp/cashflow.db"
 
@@ -96,17 +97,12 @@ Regras:
 - "oi", "ajuda", "help" → ajuda
 - Se não conseguir extrair o valor, coloque 0 e peça na resposta
 - Use emojis e linguagem brasileira informal
-- Responda SOMENTE o JSON, sem texto fora dele
+- Responda SOMENTE o JSON, sem texto fora dele, sem backticks
 """
 
 def processar_com_ia(mensagem):
-    response = anthropic_client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=500,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": mensagem}]
-    )
-    texto = response.content[0].text.strip()
+    response = model.generate_content(SYSTEM_PROMPT + "\n\nMensagem do usuário: " + mensagem)
+    texto = response.text.strip()
     texto = re.sub(r"```json|```", "", texto).strip()
     return json.loads(texto)
 
