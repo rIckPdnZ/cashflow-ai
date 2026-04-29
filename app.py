@@ -1,70 +1,57 @@
 import os
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-from twilio.rest import Client
 import anthropic
 import sqlite3
 
 app = Flask(__name__)
 
-# Clientes de API
 anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+DB_PATH = "/tmp/cashflow.db"
 
 # ─── BANCO DE DADOS ────────────────────────────────────────────────────────────
 
-def init_db():
-    conn = sqlite3.connect("cashflow.db")
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            telefone TEXT PRIMARY KEY,
-            nome TEXT,
-            ativo INTEGER DEFAULT 1,
-            criado_em TEXT
-        )
-    """)
-    c.execute("""
+def get_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS gastos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             telefone TEXT,
             descricao TEXT,
             valor REAL,
             categoria TEXT,
-            data TEXT,
-            criado_em TEXT
+            data TEXT
         )
     """)
-    c.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS limites (
             telefone TEXT PRIMARY KEY,
             limite_mensal REAL DEFAULT 0
         )
     """)
     conn.commit()
-    conn.close()
+    return conn
 
 def salvar_gasto(telefone, descricao, valor, categoria):
-    conn = sqlite3.connect("cashflow.db")
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO gastos (telefone, descricao, valor, categoria, data, criado_em) VALUES (?, ?, ?, ?, ?, ?)",
-        (telefone, descricao, valor, categoria, datetime.now().strftime("%Y-%m-%d"), datetime.now().isoformat())
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO gastos (telefone, descricao, valor, categoria, data) VALUES (?, ?, ?, ?, ?)",
+        (telefone, descricao, valor, categoria, datetime.now().strftime("%Y-%m-%d"))
     )
     conn.commit()
     conn.close()
 
 def buscar_gastos_mes(telefone, mes=None, ano=None):
-    if not mes:
-        mes = datetime.now().month
-    if not ano:
-        ano = datetime.now().year
-    conn = sqlite3.connect("cashflow.db")
+    mes = mes or datetime.now().month
+    ano = ano or datetime.now().year
+    conn = get_conn()
     c = conn.cursor()
     c.execute(
-        "SELECT descricao, valor, categoria, data FROM gastos WHERE telefone=? AND strftime('%m', data)=? AND strftime('%Y', data)=? ORDER BY data",
+        "SELECT descricao, valor, categoria FROM gastos WHERE telefone=? AND strftime('%m', data)=? AND strftime('%Y', data)=?",
         (telefone, f"{mes:02d}", str(ano))
     )
     gastos = c.fetchall()
@@ -72,11 +59,10 @@ def buscar_gastos_mes(telefone, mes=None, ano=None):
     return gastos
 
 def buscar_total_mes(telefone):
-    gastos = buscar_gastos_mes(telefone)
-    return sum(g[1] for g in gastos)
+    return sum(g[1] for g in buscar_gastos_mes(telefone))
 
 def buscar_limite(telefone):
-    conn = sqlite3.connect("cashflow.db")
+    conn = get_conn()
     c = conn.cursor()
     c.execute("SELECT limite_mensal FROM limites WHERE telefone=?", (telefone,))
     row = c.fetchone()
@@ -84,51 +70,36 @@ def buscar_limite(telefone):
     return row[0] if row else 0
 
 def salvar_limite(telefone, valor):
-    conn = sqlite3.connect("cashflow.db")
-    c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO limites (telefone, limite_mensal) VALUES (?, ?)", (telefone, valor))
+    conn = get_conn()
+    conn.execute("INSERT OR REPLACE INTO limites (telefone, limite_mensal) VALUES (?, ?)", (telefone, valor))
     conn.commit()
     conn.close()
 
-def usuario_ativo(telefone):
-    conn = sqlite3.connect("cashflow.db")
-    c = conn.cursor()
-    c.execute("SELECT ativo FROM usuarios WHERE telefone=?", (telefone,))
-    row = c.fetchone()
-    conn.close()
-    # Em produção, verifique no Hub.la se o pagamento está ativo
-    # Por ora, todo mundo que escrever é considerado ativo
-    return True
-
 # ─── IA ────────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """Você é o CashFlow AI, um assistente financeiro pessoal simpático que vive no WhatsApp.
+SYSTEM_PROMPT = """Você é o CashFlow AI, um assistente financeiro pessoal simpático no WhatsApp.
 
-Seu trabalho é ajudar o usuário a registrar gastos e entender suas finanças de forma simples e sem julgamentos.
-
-Ao receber uma mensagem, você deve identificar a INTENÇÃO e responder em JSON com este formato exato:
+Ao receber uma mensagem, identifique a intenção e responda APENAS em JSON com este formato:
 
 {
   "intencao": "gasto" | "relatorio" | "limite" | "ajuda" | "outro",
-  "descricao": "nome do gasto (se for gasto)",
+  "descricao": "nome do gasto",
   "valor": 0.0,
   "categoria": "alimentacao|transporte|lazer|saude|moradia|educacao|roupas|outros",
-  "resposta": "mensagem amigável para o usuário",
-  "pedir_confirmacao": false
+  "resposta": "mensagem amigável em português informal"
 }
 
 Regras:
-- Se o usuário mandar algo como "uber 27", "mercado 150", "almoço 35,90" → é um GASTO
-- Se mandar "relatório", "resumo", "quanto gastei" → é RELATORIO
-- Se mandar "limite 2000", "meu limite é 3000" → é LIMITE
-- Se mandar "oi", "help", "ajuda", "o que você faz" → é AJUDA
-- Seja sempre simpático, use linguagem informal e brasileira
-- NUNCA invente valores. Se não conseguir extrair o valor, pergunte
-- Categorize de forma inteligente: uber/99/taxi = transporte, ifood/restaurante = alimentacao, etc.
-- Responda APENAS o JSON, sem texto antes ou depois
+- "uber 27", "mercado 150", "almoço 35,90" → gasto
+- "relatório", "resumo", "quanto gastei" → relatorio
+- "limite 2000" → limite
+- "oi", "ajuda", "help" → ajuda
+- Se não conseguir extrair o valor, coloque 0 e peça na resposta
+- Use emojis e linguagem brasileira informal
+- Responda SOMENTE o JSON, sem texto fora dele
 """
 
-def processar_com_ia(mensagem, historico=[]):
+def processar_com_ia(mensagem):
     response = anthropic_client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=500,
@@ -136,48 +107,33 @@ def processar_com_ia(mensagem, historico=[]):
         messages=[{"role": "user", "content": mensagem}]
     )
     texto = response.content[0].text.strip()
-    # Remove possíveis backticks se a IA colocar
     texto = re.sub(r"```json|```", "", texto).strip()
     return json.loads(texto)
 
-# ─── GERADOR DE RELATÓRIO ──────────────────────────────────────────────────────
+# ─── RELATÓRIO ─────────────────────────────────────────────────────────────────
 
-def gerar_relatorio(telefone, mes=None, ano=None):
-    if not mes:
-        mes = datetime.now().month
-    if not ano:
-        ano = datetime.now().year
-
-    gastos = buscar_gastos_mes(telefone, mes, ano)
-
-    if not gastos:
-        meses = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"]
-        return f"Nenhum gasto registrado em {meses[mes-1]}/{ano}. 🐷"
-
-    # Agrupa por categoria
-    categorias = {}
-    for desc, valor, cat, data in gastos:
-        if cat not in categorias:
-            categorias[cat] = []
-        categorias[cat].append((desc, valor))
-
-    total = sum(g[1] for g in gastos)
+def gerar_relatorio(telefone):
+    mes = datetime.now().month
+    ano = datetime.now().year
+    gastos = buscar_gastos_mes(telefone)
     meses_nome = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
                   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
-    linhas = [f"📊 *Relatório Financeiro*"]
-    linhas.append(f"Período: {meses_nome[mes-1]}/{ano}\n")
+    if not gastos:
+        return f"Nenhum gasto registrado em {meses_nome[mes-1]}/{ano}. Começa mandando um gasto! 🐷"
 
-    emojis = {
-        "alimentacao": "🍔", "transporte": "🚗", "lazer": "🎮",
-        "saude": "💊", "moradia": "🏠", "educacao": "📚",
-        "roupas": "👕", "outros": "📦"
-    }
+    categorias = {}
+    for desc, valor, cat in gastos:
+        categorias.setdefault(cat, []).append((desc, valor))
 
+    total = sum(g[1] for g in gastos)
+    emojis = {"alimentacao":"🍔","transporte":"🚗","lazer":"🎮","saude":"💊",
+              "moradia":"🏠","educacao":"📚","roupas":"👕","outros":"📦"}
+
+    linhas = [f"📊 *Relatório - {meses_nome[mes-1]}/{ano}*\n"]
     for cat, itens in sorted(categorias.items(), key=lambda x: -sum(i[1] for i in x[1])):
         subtotal = sum(i[1] for i in itens)
-        emoji = emojis.get(cat, "📦")
-        linhas.append(f"{emoji} *{cat.capitalize()}* → R$ {subtotal:.2f}")
+        linhas.append(f"{emojis.get(cat,'📦')} *{cat.capitalize()}* → R$ {subtotal:.2f}")
         for desc, val in itens:
             linhas.append(f"  • {desc}: R$ {val:.2f}")
 
@@ -189,25 +145,19 @@ def gerar_relatorio(telefone, mes=None, ano=None):
         if restante >= 0:
             linhas.append(f"✅ Limite: R$ {limite:.2f} | Sobra: R$ {restante:.2f}")
         else:
-            linhas.append(f"⚠️ Limite: R$ {limite:.2f} | Passou: R$ {abs(restante):.2f}")
+            linhas.append(f"⚠️ Passou o limite em R$ {abs(restante):.2f}!")
 
     return "\n".join(linhas)
 
-# ─── WEBHOOK TWILIO ────────────────────────────────────────────────────────────
+# ─── WEBHOOK ───────────────────────────────────────────────────────────────────
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     telefone = request.form.get("From", "")
     mensagem = request.form.get("Body", "").strip()
-
     resp = MessagingResponse()
 
     if not mensagem:
-        return str(resp)
-
-    # Verifica se usuário tem acesso
-    if not usuario_ativo(telefone):
-        resp.message("Olá! Para usar o CashFlow AI, acesse o link e assine: https://seusite.com.br\n\nQualquer dúvida é só chamar! 😊")
         return str(resp)
 
     try:
@@ -221,56 +171,47 @@ def webhook():
 
             if valor > 0:
                 salvar_gasto(telefone, descricao, valor, categoria)
-
-                # Verifica limite
                 total_mes = buscar_total_mes(telefone)
                 limite = buscar_limite(telefone)
                 alerta = ""
                 if limite > 0 and total_mes >= limite * 0.9:
-                    alerta = f"\n\n⚠️ Atenção: você já usou R$ {total_mes:.2f} do seu limite de R$ {limite:.2f}!"
-
-                resposta = resultado.get("resposta", f"✅ Anotado! {descricao}: R$ {valor:.2f}")
-                resp.message(resposta + alerta)
+                    alerta = f"\n\n⚠️ Você já gastou R$ {total_mes:.2f} do limite de R$ {limite:.2f}!"
+                resp.message(resultado.get("resposta", f"✅ {descricao}: R$ {valor:.2f} anotado!") + alerta)
             else:
-                resp.message("Não consegui identificar o valor. Pode me dizer quanto foi? Ex: *mercado 85,50*")
+                resp.message("Não consegui identificar o valor. Me diz assim: *mercado 85,50* 😊")
 
         elif intencao == "relatorio":
-            relatorio = gerar_relatorio(telefone)
-            resp.message(relatorio)
+            resp.message(gerar_relatorio(telefone))
 
         elif intencao == "limite":
             valor = resultado.get("valor", 0)
             if valor > 0:
                 salvar_limite(telefone, valor)
-                resp.message(f"✅ Limite mensal definido: R$ {valor:.2f}\n\nVou te avisar quando estiver chegando perto! 🐷")
+                resp.message(f"✅ Limite mensal definido: R$ {valor:.2f} 🐷")
             else:
-                resp.message("Qual valor você quer como limite mensal? Ex: *limite 2000*")
+                resp.message("Qual o valor do limite? Ex: *limite 2000*")
 
         elif intencao == "ajuda":
             resp.message(
-                "👋 Olá! Sou o *CashFlow AI*, seu assistente financeiro no WhatsApp!\n\n"
+                "👋 Olá! Sou o *CashFlow AI*!\n\n"
                 "É simples assim:\n\n"
-                "💬 *Registrar gasto:*\nDigite o que gastou e o valor\n"
-                "Ex: _uber 27_ ou _almoço 35,90_\n\n"
-                "📊 *Ver relatório:*\nDigite _relatório_ ou _resumo_\n\n"
-                "⚠️ *Definir limite mensal:*\nDigite _limite 2000_\n\n"
-                "Vamos começar? Me conta um gasto de hoje! 😄"
+                "💬 *Registrar gasto:*\n_uber 27_ ou _almoço 35,90_\n\n"
+                "📊 *Ver relatório:*\n_relatório_ ou _resumo_\n\n"
+                "⚠️ *Definir limite mensal:*\n_limite 2000_\n\n"
+                "Me conta um gasto de hoje! 😄"
             )
         else:
-            resp.message(resultado.get("resposta", "Não entendi. Tente: _mercado 50_ para registrar um gasto, ou _relatório_ para ver o resumo."))
+            resp.message(resultado.get("resposta", "Não entendi 😅 Tenta: _mercado 50_ ou manda _ajuda_"))
 
     except Exception as e:
         print(f"Erro: {e}")
-        resp.message("Ops, tive um problema aqui. Tenta de novo! Se persistir, manda _ajuda_ 🐷")
+        resp.message("Ops, tive um probleminha! Tenta de novo 🐷")
 
     return str(resp)
 
 @app.route("/", methods=["GET"])
 def health():
-    return "CashFlow AI está rodando! 🚀"
-
-# Inicializa o banco sempre que o servidor sobe
-init_db()
+    return "CashFlow AI rodando! 🚀"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
