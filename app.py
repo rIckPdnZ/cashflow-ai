@@ -10,7 +10,7 @@ import google.generativeai as genai
 app = Flask(__name__)
 
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 DB_PATH = "/tmp/cashflow.db"
 
