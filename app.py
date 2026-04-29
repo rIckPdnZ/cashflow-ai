@@ -269,6 +269,8 @@ def webhook():
 def health():
     return "CashFlow AI está rodando! 🚀"
 
+# Inicializa o banco sempre que o servidor sobe
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
