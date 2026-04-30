@@ -5,15 +5,13 @@ from datetime import datetime
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import sqlite3
-from groq import
+from groq import Groq
 
 app = Flask(__name__)
 
-gemini_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+groq_client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 DB_PATH = "/tmp/cashflow.db"
-
-# ─── BANCO DE DADOS ────────────────────────────────────────────────────────────
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
@@ -75,40 +73,30 @@ def salvar_limite(telefone, valor):
     conn.commit()
     conn.close()
 
-# ─── IA ────────────────────────────────────────────────────────────────────────
+SYSTEM_PROMPT = """Voce e o CashFlow AI, assistente financeiro no WhatsApp.
 
-SYSTEM_PROMPT = """Você é o CashFlow AI, um assistente financeiro pessoal simpático no WhatsApp.
-
-Ao receber uma mensagem, identifique a intenção e responda APENAS em JSON com este formato:
-
-{
-  "intencao": "gasto" | "relatorio" | "limite" | "ajuda" | "outro",
-  "descricao": "nome do gasto",
-  "valor": 0.0,
-  "categoria": "alimentacao|transporte|lazer|saude|moradia|educacao|roupas|outros",
-  "resposta": "mensagem amigável em português informal"
-}
+Responda APENAS em JSON com este formato exato:
+{"intencao": "gasto|relatorio|limite|ajuda|outro", "descricao": "nome do gasto", "valor": 0.0, "categoria": "alimentacao|transporte|lazer|saude|moradia|educacao|roupas|outros", "resposta": "mensagem simpatica em portugues"}
 
 Regras:
-- "uber 27", "mercado 150", "almoco 35,90" → gasto
-- "relatorio", "resumo", "quanto gastei" → relatorio
-- "limite 2000" → limite
-- "oi", "ajuda", "help" → ajuda
-- Se nao conseguir extrair o valor, coloque 0 e peca na resposta
-- Use emojis e linguagem brasileira informal
-- Responda SOMENTE o JSON, sem texto fora dele, sem backticks
-"""
+- "uber 27", "mercado 150", "almoco 35.90" = gasto
+- "relatorio", "resumo", "quanto gastei" = relatorio
+- "limite 2000" = limite
+- "oi", "ajuda", "help" = ajuda
+- Se nao achar valor, coloque 0 e peca na resposta
+- SOMENTE o JSON, sem texto fora, sem backticks"""
 
 def processar_com_ia(mensagem):
-    response = gemini_client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=SYSTEM_PROMPT + "\n\nMensagem do usuario: " + mensagem
+    response = groq_client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": mensagem}
+        ]
     )
-    texto = response.text.strip()
+    texto = response.choices[0].message.content.strip()
     texto = re.sub(r"```json|```", "", texto).strip()
     return json.loads(texto)
-
-# ─── RELATORIO ─────────────────────────────────────────────────────────────────
 
 def gerar_relatorio(telefone):
     mes = datetime.now().month
@@ -118,7 +106,7 @@ def gerar_relatorio(telefone):
                   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
     if not gastos:
-        return f"Nenhum gasto registrado em {meses_nome[mes-1]}/{ano}. Comeca mandando um gasto! 🐷"
+        return f"Nenhum gasto em {meses_nome[mes-1]}/{ano}. Manda um gasto pra comecar! 🐷"
 
     categorias = {}
     for desc, valor, cat in gastos:
@@ -136,7 +124,6 @@ def gerar_relatorio(telefone):
             linhas.append(f"  • {desc}: R$ {val:.2f}")
 
     linhas.append(f"\n💰 *Total: R$ {total:.2f}*")
-
     limite = buscar_limite(telefone)
     if limite > 0:
         restante = limite - total
@@ -146,8 +133,6 @@ def gerar_relatorio(telefone):
             linhas.append(f"⚠️ Passou o limite em R$ {abs(restante):.2f}!")
 
     return "\n".join(linhas)
-
-# ─── WEBHOOK ───────────────────────────────────────────────────────────────────
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -166,7 +151,6 @@ def webhook():
             valor = resultado.get("valor", 0)
             descricao = resultado.get("descricao", mensagem)
             categoria = resultado.get("categoria", "outros")
-
             if valor > 0:
                 salvar_gasto(telefone, descricao, valor, categoria)
                 total_mes = buscar_total_mes(telefone)
@@ -176,7 +160,7 @@ def webhook():
                     alerta = f"\n\n⚠️ Voce ja gastou R$ {total_mes:.2f} do limite de R$ {limite:.2f}!"
                 resp.message(resultado.get("resposta", f"✅ {descricao}: R$ {valor:.2f} anotado!") + alerta)
             else:
-                resp.message("Nao consegui identificar o valor. Me diz assim: *mercado 85,50* 😊")
+                resp.message("Nao achei o valor. Me diz assim: *mercado 85.50* 😊")
 
         elif intencao == "relatorio":
             resp.message(gerar_relatorio(telefone))
@@ -185,25 +169,24 @@ def webhook():
             valor = resultado.get("valor", 0)
             if valor > 0:
                 salvar_limite(telefone, valor)
-                resp.message(f"✅ Limite mensal definido: R$ {valor:.2f} 🐷")
+                resp.message(f"✅ Limite definido: R$ {valor:.2f} 🐷")
             else:
-                resp.message("Qual o valor do limite? Ex: *limite 2000*")
+                resp.message("Qual o limite? Ex: *limite 2000*")
 
         elif intencao == "ajuda":
             resp.message(
                 "👋 Ola! Sou o *CashFlow AI*!\n\n"
-                "E simples assim:\n\n"
-                "💬 *Registrar gasto:*\n_uber 27_ ou _almoco 35,90_\n\n"
-                "📊 *Ver relatorio:*\n_relatorio_ ou _resumo_\n\n"
-                "⚠️ *Definir limite mensal:*\n_limite 2000_\n\n"
-                "Me conta um gasto de hoje! 😄"
+                "💬 *Gasto:* _uber 27_ ou _almoco 35.90_\n\n"
+                "📊 *Relatorio:* _relatorio_ ou _resumo_\n\n"
+                "⚠️ *Limite:* _limite 2000_\n\n"
+                "Manda um gasto pra comecar! 😄"
             )
         else:
-            resp.message(resultado.get("resposta", "Nao entendi 😅 Tenta: _mercado 50_ ou manda _ajuda_"))
+            resp.message(resultado.get("resposta", "Nao entendi 😅 Tenta: _mercado 50_ ou _ajuda_"))
 
     except Exception as e:
         print(f"Erro: {e}")
-        resp.message("Ops, tive um probleminha! Tenta de novo 🐷")
+        resp.message("Ops, erro aqui! Tenta de novo 🐷")
 
     return str(resp)
 
