@@ -213,28 +213,32 @@ def gerar_relatorio(telefone):
 MSG_BEM_VINDO = (
     "👋 Oi! Seja bem-vindo ao *CashFlow AI!* 🤖💸\n\n"
     "Serei seu assistente financeiro pessoal aqui no WhatsApp.\n\n"
-    "E simples assim:\n\n"
+    "É simples assim:\n\n"
     "💬 *Registre seus gastos:*\n"
-    "Só mandar o nome e o valor\n\n"
-    "📊 *Veja seu relatorio:*\n"
-    "relatório mensal\n\n"
+    "Só manda o nome e o valor\n"
+    "_uber 27_ • _almoço 35.90_ • _mercado 200_\n\n"
+    "📊 *Veja seu relatório:*\n"
+    "_relatório_ ou _resumo_\n\n"
     "⚠️ *Defina um limite mensal:*\n"
-    "Ex: 3000\n\n"
+    "_limite 2000_\n\n"
     "❓ *Precisa de ajuda?*\n"
     "_ajuda_ ou _comandos_\n\n"
-    "Agora me conta: qual foi seu ultimo gasto? 😄"
+    "Agora me conta: qual foi seu último gasto? 😄"
 )
 
 MSG_AJUDA = (
     "🤖 *CashFlow AI — Comandos:*\n\n"
-    "💬 *Registrar gasto:*\n\n"
-    "📊 *Ver relatorio do mes:*\n\n"
-    "⚠️ *Definir limite mensal:*\n\n"
-    "🗑️ *Apagar ultimo gasto:*\n"
+    "💬 *Registrar gasto:*\n"
+    "_uber 27_ • _almoço 35.90_ • _mercado 200_\n\n"
+    "📊 *Ver relatório do mês:*\n"
+    "_relatório_ ou _resumo_\n\n"
+    "⚠️ *Definir limite mensal:*\n"
+    "_limite 2000_\n\n"
+    "🗑️ *Apagar último gasto:*\n"
     "_apagar_ ou _errei_\n\n"
     "💡 *Pedir uma dica financeira:*\n"
     "_dica_\n\n"
-    "Qualquer duvida e so chamar! 💸"
+    "Qualquer dúvida é só chamar! 💸"
 )
 
 # ─── WEBHOOK ───────────────────────────────────────────────────────────────────
