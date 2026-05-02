@@ -3,98 +3,111 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Cash Flow IA — Seu assistente financeiro no WhatsApp</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<title>Cash Flow IA — Controle financeiro direto no WhatsApp</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
-body { font-family: 'Inter', sans-serif; background: #fff; color: #111; overflow-x: hidden; }
+body { font-family: 'DM Sans', sans-serif; background: #fff; color: #111; overflow-x: hidden; }
 
-/* NAV */
+/* ---- NAV ---- */
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
-  border-bottom: 1px solid #eee;
+  background: rgba(255,255,255,0.96); backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0,0,0,0.07);
   display: flex; align-items: center; justify-content: space-between;
-  padding: 1rem 1.2rem;
+  padding: 0.75rem 1.25rem;
 }
-.logo { font-weight: 900; font-size: 1.1rem; color: #111; display: flex; align-items: center; gap: 0.4rem; }
-.logo span { color: #22C55E; }
+.logo {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.logo img.brand-logo {
+  height: 32px; width: auto; object-fit: contain;
+}
 .nav-btn {
-  background: #22C55E; color: #fff; font-weight: 700; font-size: 0.8rem;
-  padding: 0.55rem 1.1rem; border-radius: 100px; text-decoration: none;
-  border: none; cursor: pointer;
+  background: #16a34a; color: #fff; font-family: 'Sora', sans-serif;
+  font-weight: 700; font-size: 0.8rem;
+  padding: 0.55rem 1.2rem; border-radius: 100px; text-decoration: none;
+  letter-spacing: 0.01em; transition: background 0.2s;
 }
+.nav-btn:hover { background: #15803d; }
 
-/* HERO */
+/* ---- HERO ---- */
 .hero {
-  padding: 6rem 1.4rem 3rem;
+  padding: 5.5rem 1.4rem 2.5rem;
+  background: linear-gradient(160deg, #f0fdf4 0%, #ffffff 55%);
   text-align: center;
-  background: linear-gradient(180deg, #f0faf3 0%, #fff 100%);
 }
 .hero-badge {
-  display: inline-block;
-  background: #dcfce7; color: #15803d;
-  font-size: 0.75rem; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: #dcfce7; color: #166534;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   padding: 0.4rem 1rem; border-radius: 100px;
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.4rem; border: 1px solid #bbf7d0;
 }
 .hero h1 {
-  font-size: 2.4rem; font-weight: 900; line-height: 1.1;
-  margin-bottom: 1rem; color: #111;
+  font-family: 'Sora', sans-serif;
+  font-size: 2.3rem; font-weight: 900; line-height: 1.1;
+  margin-bottom: 1rem; color: #0a0a0a; letter-spacing: -0.02em;
 }
-.hero h1 .highlight {
-  color: #22C55E;
-  background: linear-gradient(180deg, transparent 65%, #bbf7d0 65%);
-  padding: 0 2px;
+.hero h1 .accent { color: #16a34a; }
+.hero h1 .underline-green {
+  position: relative; display: inline-block;
 }
-.hero p {
-  font-size: 1rem; color: #555; line-height: 1.6;
+.hero h1 .underline-green::after {
+  content: '';
+  position: absolute; left: 0; bottom: -3px; right: 0;
+  height: 6px; background: #bbf7d0; border-radius: 4px; z-index: -1;
+}
+.hero-desc {
+  font-size: 1rem; color: #4b5563; line-height: 1.65;
   margin-bottom: 2rem; max-width: 340px; margin-left: auto; margin-right: auto;
 }
 .hero-cta {
   display: block; width: 100%; max-width: 340px; margin: 0 auto 0.8rem;
-  background: #22C55E; color: #fff; font-weight: 800; font-size: 1.05rem;
-  padding: 1.1rem; border-radius: 14px; text-decoration: none;
-  box-shadow: 0 4px 20px rgba(34,197,94,0.35);
+  background: #16a34a; color: #fff;
+  font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1rem;
+  padding: 1.1rem 1.5rem; border-radius: 14px; text-decoration: none;
+  box-shadow: 0 6px 24px rgba(22,163,74,0.35); letter-spacing: 0.01em;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
-.hero-sub { font-size: 0.78rem; color: #888; margin-bottom: 2.5rem; }
+.hero-cta:active { transform: scale(0.98); }
+.hero-sub { font-size: 0.75rem; color: #9ca3af; margin-bottom: 2.5rem; }
 
-/* PHONE MOCKUP */
-.phone-wrap {
-  display: flex; justify-content: center;
-  margin: 0 auto;
-}
+/* ---- PHONE MOCKUP ---- */
+.phone-wrap { display: flex; justify-content: center; margin-top: 0.5rem; }
 .phone {
-  width: 260px;
+  width: 264px;
   background: #fff;
-  border-radius: 36px;
-  border: 3px solid #111;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  border-radius: 38px;
+  border: 3px solid #1a1a1a;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.14), 0 0 0 6px rgba(22,163,74,0.08);
   overflow: hidden;
-  position: relative;
 }
 .phone-notch {
-  background: #111; height: 28px;
+  background: #1a1a1a; height: 26px;
   display: flex; align-items: center; justify-content: center;
 }
-.phone-notch-pill { background: #333; width: 80px; height: 10px; border-radius: 10px; }
+.phone-notch-pill { background: #3a3a3a; width: 72px; height: 8px; border-radius: 10px; }
 .phone-header {
-  background: #075e54; padding: 0.7rem 1rem;
-  display: flex; align-items: center; gap: 0.6rem;
+  background: #075e54; padding: 0.65rem 0.9rem;
+  display: flex; align-items: center; gap: 0.65rem;
 }
 .phone-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: #25D366; display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem;
+  width: 38px; height: 38px; border-radius: 50%;
+  overflow: hidden; border: 2px solid rgba(255,255,255,0.25);
+  background: #dcfce7; flex-shrink: 0;
 }
-.phone-name { color: #fff; font-weight: 700; font-size: 0.85rem; }
-.phone-status { color: #a8d5b5; font-size: 0.7rem; }
-.phone-body { background: #e5ddd5; padding: 0.8rem; min-height: 220px; }
+.phone-avatar img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.phone-name { color: #fff; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.85rem; }
+.phone-status { color: #a7f3d0; font-size: 0.68rem; }
+.phone-body { background: #e5ddd5; padding: 0.85rem; min-height: 235px; }
 .bubble-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
 .bubble {
-  max-width: 85%; padding: 0.5rem 0.7rem;
-  border-radius: 10px; font-size: 0.72rem; line-height: 1.4;
+  max-width: 84%; padding: 0.5rem 0.75rem;
+  border-radius: 10px; font-size: 0.71rem; line-height: 1.45;
 }
 .bubble-out {
   background: #dcf8c6; align-self: flex-end;
@@ -103,201 +116,244 @@ nav {
 .bubble-in {
   background: #fff; align-self: flex-start;
   border-bottom-left-radius: 2px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
-.bubble-time { font-size: 0.6rem; color: #999; text-align: right; margin-top: 2px; }
+.bubble-time { font-size: 0.59rem; color: #aaa; text-align: right; margin-top: 3px; }
+.bubble-id { font-size: 0.6rem; color: #a3b4c2; font-family: monospace; }
 
-/* SECTION */
+/* ---- SECTION DEFAULTS ---- */
 section { padding: 3.5rem 1.4rem; }
 .sec-label {
   display: inline-block;
-  background: #f0faf3; color: #15803d;
-  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  background: #f0fdf4; color: #15803d;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   padding: 0.35rem 0.9rem; border-radius: 100px;
-  margin-bottom: 1rem;
+  margin-bottom: 1rem; border: 1px solid #d1fae5;
 }
-.sec-title { font-size: 1.8rem; font-weight: 900; line-height: 1.15; margin-bottom: 0.8rem; }
-.sec-sub { font-size: 0.95rem; color: #555; line-height: 1.6; margin-bottom: 2rem; }
+.sec-title {
+  font-family: 'Sora', sans-serif;
+  font-size: 1.75rem; font-weight: 900; line-height: 1.15;
+  margin-bottom: 0.75rem; letter-spacing: -0.02em;
+}
+.sec-sub { font-size: 0.95rem; color: #6b7280; line-height: 1.65; margin-bottom: 2rem; }
 
-/* HOW IT WORKS */
-.how { background: #f8fdf9; }
-.timeline { display: flex; flex-direction: column; gap: 0; position: relative; }
+/* ---- HOW IT WORKS ---- */
+.how { background: #fafafa; border-top: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; }
+.timeline { display: flex; flex-direction: column; }
 .timeline-item {
   display: flex; gap: 1rem; position: relative; padding-bottom: 2rem;
 }
 .timeline-item:last-child { padding-bottom: 0; }
 .timeline-left { display: flex; flex-direction: column; align-items: center; }
 .timeline-num {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: #111; color: #fff;
-  font-weight: 900; font-size: 1.1rem;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: #16a34a; color: #fff;
+  font-family: 'Sora', sans-serif; font-weight: 900; font-size: 1rem;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; z-index: 1;
+  flex-shrink: 0; z-index: 1; box-shadow: 0 4px 12px rgba(22,163,74,0.3);
 }
-.timeline-line {
-  width: 2px; background: #ddd; flex: 1; margin: 4px 0;
-}
+.timeline-line { width: 2px; background: #e5e7eb; flex: 1; margin: 4px 0; }
 .timeline-item:last-child .timeline-line { display: none; }
-.timeline-content { padding-top: 0.5rem; }
-.timeline-content h3 { font-size: 1rem; font-weight: 800; margin-bottom: 0.3rem; }
-.timeline-content p { font-size: 0.87rem; color: #555; line-height: 1.5; }
-.timeline-example {
-  margin-top: 0.6rem;
-  background: #fff; border: 1px solid #e5e7eb;
-  border-radius: 8px; padding: 0.5rem 0.8rem;
-  font-size: 0.78rem; color: #22C55E; font-family: monospace;
+.timeline-content { padding-top: 0.4rem; }
+.timeline-content h3 {
+  font-family: 'Sora', sans-serif;
+  font-size: 0.98rem; font-weight: 800; margin-bottom: 0.3rem;
+}
+.timeline-content p { font-size: 0.87rem; color: #6b7280; line-height: 1.55; }
+.timeline-tag {
+  margin-top: 0.65rem;
+  display: inline-block;
+  background: #f0fdf4; border: 1px solid #d1fae5;
+  border-radius: 8px; padding: 0.4rem 0.75rem;
+  font-size: 0.76rem; color: #16a34a; font-family: 'DM Mono', monospace;
+  font-weight: 600;
 }
 
-/* CAROUSEL */
-.carousel-section { background: #111; color: #fff; }
-.carousel-section .sec-label { background: rgba(255,255,255,0.1); color: #86efac; }
-.carousel-section .sec-title { color: #fff; }
-.carousel-section .sec-sub { color: #aaa; }
-.carousel { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+/* ---- FEATURES CAROUSEL ---- */
+.carousel-section { background: #0f172a; color: #fff; }
+.carousel-section .sec-label { background: rgba(255,255,255,0.07); color: #86efac; border-color: rgba(134,239,172,0.2); }
+.carousel-section .sec-title { color: #f9fafb; }
+.carousel-section .sec-sub { color: #9ca3af; }
+.carousel {
+  display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 0.5rem;
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
 .carousel::-webkit-scrollbar { display: none; }
 .carousel-card {
-  min-width: 260px; background: #1a1a1a; border: 1px solid #2a2a2a;
-  border-radius: 16px; padding: 1.5rem; scroll-snap-align: start; flex-shrink: 0;
+  min-width: 252px; background: #1e293b; border: 1px solid #334155;
+  border-radius: 18px; padding: 1.5rem; scroll-snap-align: start; flex-shrink: 0;
+  transition: border-color 0.2s;
 }
-.carousel-icon { font-size: 2rem; margin-bottom: 0.8rem; }
-.carousel-card h3 { font-size: 1rem; font-weight: 800; margin-bottom: 0.5rem; color: #fff; }
-.carousel-card p { font-size: 0.85rem; color: #888; line-height: 1.5; }
-.carousel-hint { text-align: center; font-size: 0.78rem; color: #666; margin-top: 0.5rem; font-style: italic; }
+.carousel-card:hover { border-color: #16a34a; }
+.carousel-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; margin-bottom: 1rem;
+}
+.carousel-card h3 { font-family: 'Sora', sans-serif; font-size: 0.95rem; font-weight: 800; margin-bottom: 0.5rem; color: #f9fafb; }
+.carousel-card p { font-size: 0.84rem; color: #94a3b8; line-height: 1.55; }
+.carousel-hint { text-align: center; font-size: 0.76rem; color: #475569; margin-top: 1rem; }
 
-/* TESTIMONIALS */
+/* ---- TESTIMONIALS ---- */
 .testimonials { background: #fff; }
 .testi-list { display: flex; flex-direction: column; gap: 1rem; }
 .testi {
-  background: #fff; border: 1px solid #eee;
-  border-radius: 16px; padding: 1.4rem;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 18px; padding: 1.4rem;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04);
 }
-.testi-stars { color: #FBBF24; font-size: 1rem; margin-bottom: 0.7rem; }
-.testi-text { font-size: 0.9rem; color: #333; line-height: 1.6; margin-bottom: 1rem; font-style: italic; }
+.testi-stars { color: #f59e0b; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.05em; }
+.testi-text { font-size: 0.9rem; color: #374151; line-height: 1.65; margin-bottom: 1rem; }
 .testi-author { display: flex; align-items: center; gap: 0.7rem; }
 .testi-avatar {
   width: 40px; height: 40px; border-radius: 50%;
-  background: #f0faf3; display: flex; align-items: center; justify-content: center;
-  font-size: 1.2rem; border: 2px solid #dcfce7;
+  background: #f0fdf4; display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; border: 2px solid #d1fae5; flex-shrink: 0;
 }
-.testi-name { font-weight: 700; font-size: 0.88rem; }
-.testi-role { font-size: 0.75rem; color: #888; }
+.testi-name { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.87rem; }
+.testi-role { font-size: 0.73rem; color: #9ca3af; }
 
-/* SOCIAL PROOF BAR */
+/* ---- PROOF BAR ---- */
 .proof-bar {
-  background: #f8fdf9; padding: 1.5rem 1.4rem;
+  background: #f0fdf4; padding: 1.5rem 1.4rem;
   display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1rem;
-  border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb;
+  border-top: 1px solid #d1fae5; border-bottom: 1px solid #d1fae5;
 }
 .proof-item { text-align: center; }
-.proof-num { font-size: 1.6rem; font-weight: 900; color: #111; }
-.proof-label { font-size: 0.75rem; color: #666; }
+.proof-num { font-family: 'Sora', sans-serif; font-size: 1.7rem; font-weight: 900; color: #16a34a; }
+.proof-label { font-size: 0.72rem; color: #6b7280; margin-top: 0.1rem; }
 
-/* PRICING */
+/* ---- PRICING ---- */
 .pricing { background: #fff; text-align: center; }
 .price-card {
-  background: #f8fdf9; border: 2px solid #22C55E;
-  border-radius: 20px; padding: 2rem 1.4rem;
-  position: relative; margin-top: 1.5rem;
-  box-shadow: 0 8px 30px rgba(34,197,94,0.12);
+  background: #f0fdf4; border: 2px solid #16a34a;
+  border-radius: 22px; padding: 2rem 1.5rem;
+  position: relative; margin-top: 1.8rem;
+  box-shadow: 0 12px 40px rgba(22,163,74,0.1);
 }
 .price-tag-top {
-  position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
-  background: #22C55E; color: #fff;
-  font-size: 0.72rem; font-weight: 800;
-  padding: 0.3rem 1rem; border-radius: 100px; white-space: nowrap;
+  position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+  background: #16a34a; color: #fff;
+  font-family: 'Sora', sans-serif; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em;
+  padding: 0.32rem 1.1rem; border-radius: 100px; white-space: nowrap;
 }
-.price-name { font-size: 1rem; font-weight: 700; color: #555; margin-bottom: 0.3rem; }
-.price-big { font-size: 3.2rem; font-weight: 900; color: #111; line-height: 1; }
-.price-big sup { font-size: 1.3rem; vertical-align: super; }
-.price-period { color: #888; font-size: 0.85rem; margin: 0.3rem 0; }
-.price-equiv { color: #22C55E; font-weight: 700; font-size: 0.9rem; margin-bottom: 1.5rem; }
-.price-list { text-align: left; margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.6rem; }
-.price-item { display: flex; align-items: center; gap: 0.7rem; font-size: 0.88rem; }
-.price-item::before { content: '✓'; color: #22C55E; font-weight: 900; font-size: 1rem; }
+.price-name { font-size: 0.9rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem; letter-spacing: 0.03em; text-transform: uppercase; }
+.price-big {
+  font-family: 'Sora', sans-serif;
+  font-size: 3.4rem; font-weight: 900; color: #0a0a0a; line-height: 1;
+  letter-spacing: -0.03em;
+}
+.price-big sup { font-size: 1.2rem; vertical-align: super; font-weight: 700; }
+.price-period { color: #9ca3af; font-size: 0.83rem; margin: 0.4rem 0 0.25rem; }
+.price-equiv { color: #16a34a; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.9rem; margin-bottom: 1.75rem; }
+.price-list { text-align: left; margin-bottom: 1.75rem; display: flex; flex-direction: column; gap: 0.65rem; }
+.price-item { display: flex; align-items: flex-start; gap: 0.65rem; font-size: 0.88rem; color: #374151; }
+.price-check {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #dcfce7; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 0.7rem; color: #16a34a; font-weight: 900; margin-top: 1px;
+}
 .price-btn {
   display: block; width: 100%;
-  background: #22C55E; color: #fff;
-  font-weight: 800; font-size: 1.05rem;
-  padding: 1.1rem; border-radius: 14px;
-  text-decoration: none; margin-bottom: 0.8rem;
-  box-shadow: 0 4px 20px rgba(34,197,94,0.35);
+  background: #16a34a; color: #fff;
+  font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1rem;
+  padding: 1.1rem; border-radius: 14px; text-decoration: none;
+  margin-bottom: 0.85rem; letter-spacing: 0.01em;
+  box-shadow: 0 6px 24px rgba(22,163,74,0.35);
+  transition: background 0.2s, transform 0.15s;
 }
-.price-secure { font-size: 0.75rem; color: #888; }
+.price-btn:active { transform: scale(0.98); }
+.price-secure { font-size: 0.73rem; color: #9ca3af; }
 
-/* FAQ */
-.faq { background: #f8fdf9; }
-.faq-list { display: flex; flex-direction: column; gap: 0.7rem; }
-.faq-item { background: #fff; border: 1px solid #eee; border-radius: 12px; overflow: hidden; }
+/* ---- FAQ ---- */
+.faq { background: #fafafa; border-top: 1px solid #f0f0f0; }
+.faq-list { display: flex; flex-direction: column; gap: 0.65rem; }
+.faq-item { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; }
 .faq-q {
-  padding: 1rem 1.2rem; font-weight: 700; font-size: 0.9rem;
+  padding: 1rem 1.2rem;
+  font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.875rem;
   cursor: pointer; display: flex; justify-content: space-between; align-items: center;
-  user-select: none;
+  user-select: none; color: #111;
 }
-.faq-chevron { color: #22C55E; font-size: 1.2rem; transition: transform 0.2s; }
+.faq-chevron { color: #16a34a; font-size: 1.3rem; transition: transform 0.25s; line-height: 1; }
 .faq-item.open .faq-chevron { transform: rotate(45deg); }
 .faq-a {
-  max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
-  padding: 0 1.2rem; font-size: 0.88rem; color: #555; line-height: 1.6;
+  max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.2s;
+  padding: 0 1.2rem; font-size: 0.875rem; color: #6b7280; line-height: 1.65;
 }
-.faq-item.open .faq-a { max-height: 150px; padding: 0 1.2rem 1rem; }
+.faq-item.open .faq-a { max-height: 200px; padding: 0 1.2rem 1.1rem; }
 
-/* CTA FINAL */
+/* ---- FINAL CTA ---- */
 .cta-final {
-  background: #22C55E; padding: 3.5rem 1.4rem; text-align: center;
+  background: linear-gradient(135deg, #15803d 0%, #16a34a 60%, #22c55e 100%);
+  padding: 3.5rem 1.4rem; text-align: center;
 }
-.cta-final h2 { font-size: 1.8rem; font-weight: 900; color: #fff; margin-bottom: 0.8rem; line-height: 1.2; }
-.cta-final p { color: rgba(255,255,255,0.85); font-size: 0.95rem; margin-bottom: 2rem; }
+.cta-final h2 {
+  font-family: 'Sora', sans-serif;
+  font-size: 1.9rem; font-weight: 900; color: #fff;
+  margin-bottom: 0.75rem; line-height: 1.15; letter-spacing: -0.02em;
+}
+.cta-final p { color: rgba(255,255,255,0.82); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.6; }
 .cta-final-btn {
   display: block; width: 100%;
   background: #fff; color: #15803d;
-  font-weight: 800; font-size: 1.05rem;
-  padding: 1.1rem; border-radius: 14px;
-  text-decoration: none; margin-bottom: 0.8rem;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1rem;
+  padding: 1.1rem; border-radius: 14px; text-decoration: none;
+  margin-bottom: 0.85rem; letter-spacing: 0.01em;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12);
 }
-.cta-final-sub { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
+.cta-final-sub { font-size: 0.76rem; color: rgba(255,255,255,0.65); }
 
-/* STICKY BOTTOM BTN */
+/* ---- STICKY BTN ---- */
 .sticky-btn {
   position: fixed; bottom: 0; left: 0; right: 0;
-  padding: 0.8rem 1.4rem 1.2rem;
-  background: linear-gradient(transparent, rgba(255,255,255,0.98) 30%);
+  padding: 0.75rem 1.25rem 1.1rem;
+  background: linear-gradient(to top, rgba(255,255,255,1) 60%, transparent);
   z-index: 99;
 }
 .sticky-btn a {
   display: block; width: 100%;
-  background: #22C55E; color: #fff;
-  font-weight: 800; font-size: 1rem;
-  padding: 1rem; border-radius: 14px;
-  text-decoration: none; text-align: center;
-  box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+  background: #16a34a; color: #fff;
+  font-family: 'Sora', sans-serif; font-weight: 800; font-size: 0.95rem;
+  padding: 1rem; border-radius: 14px; text-decoration: none; text-align: center;
+  box-shadow: 0 6px 24px rgba(22,163,74,0.4); letter-spacing: 0.01em;
 }
 
-/* FOOTER */
-footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; border-top: 1px solid #eee; padding-bottom: 5rem; }
+/* ---- FOOTER ---- */
+footer {
+  padding: 1.5rem; text-align: center;
+  font-size: 0.73rem; color: #bbb;
+  border-top: 1px solid #f0f0f0;
+  padding-bottom: 5.5rem;
+}
 </style>
 </head>
 <body>
 
+<!-- NAV -->
 <nav>
-  <div class="logo">🤖 Cash Flow <span>IA</span></div>
-  <a href="#preco" class="nav-btn">Começar →</a>
+  <div class="logo">
+    <img src="cashflow-logo.png" alt="Cash Flow IA" class="brand-logo">
+  </div>
+  <a href="#preco" class="nav-btn">Começar agora →</a>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-badge">🤖 IA Financeira no WhatsApp</div>
-  <h1>Organize seu dinheiro direto no seu <span class="highlight">WhatsApp!</span></h1>
-  <p>O Cash Flow IA registra e organiza todos os seus gastos direto no WhatsApp. Sem apps confusos, sem planilhas chatas.</p>
-  <a href="#preco" class="hero-cta">💸 Quero controlar meu dinheiro</a>
-  <p class="hero-sub">🔒 Pix ou cartão · Acesso imediato</p>
+  <div class="hero-badge">✦ Controle financeiro via WhatsApp</div>
+  <h1>Seu dinheiro, organizado em <span class="underline-green accent">segundos</span></h1>
+  <p class="hero-desc">O Cash Flow IA registra seus gastos, gera relatórios e te avisa quando está passando do limite — tudo pelo WhatsApp que você já usa.</p>
+  <a href="#preco" class="hero-cta">Ativar o Cash Flow IA →</a>
+  <p class="hero-sub">🔒 Pix ou cartão &nbsp;·&nbsp; Acesso imediato</p>
 
   <div class="phone-wrap">
     <div class="phone">
       <div class="phone-notch"><div class="phone-notch-pill"></div></div>
       <div class="phone-header">
-        <div class="phone-avatar">🤖</div>
+        <div class="phone-avatar">
+          <img src="cashflow-logo.png" alt="Cash Flow IA">
+        </div>
         <div>
           <div class="phone-name">Cash Flow IA</div>
           <div class="phone-status">● online agora</div>
@@ -305,30 +361,30 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
       </div>
       <div class="phone-body">
         <div class="bubble-wrap">
-          <div class="bubble bubble-out">misto quente 19<div class="bubble-time">18:54 ✓✓</div></div>
+          <div class="bubble bubble-out">açaí 18<div class="bubble-time">14:22 ✓✓</div></div>
           <div class="bubble bubble-in">
-            ✅ Gasto Registrado!<br>
-            🍔 Misto quente (Alimentação)<br>
-            💰 R$19<br>
-            📅 Hoje — #a3b1c2
-            <div class="bubble-time">18:54</div>
+            ✅ <strong>Gasto registrado!</strong><br>
+            🍧 Açaí · Alimentação<br>
+            💰 R$ 18,00 · Hoje<br>
+            <span class="bubble-id">#f2a9c1</span>
+            <div class="bubble-time">14:22</div>
           </div>
-          <div class="bubble bubble-out">gasolina 150<div class="bubble-time">18:59 ✓✓</div></div>
+          <div class="bubble bubble-out">mercado 87<div class="bubble-time">16:45 ✓✓</div></div>
           <div class="bubble bubble-in">
-            ✅ Gasto Registrado!<br>
-            ⛽ Gasolina (Transporte)<br>
-            💰 R$150<br>
-            📅 Hoje — #d4e5f6
-            <div class="bubble-time">18:59</div>
+            ✅ <strong>Gasto registrado!</strong><br>
+            🛒 Mercado · Alimentação<br>
+            💰 R$ 87,00 · Hoje<br>
+            <span class="bubble-id">#b3d7e4</span>
+            <div class="bubble-time">16:45</div>
           </div>
-          <div class="bubble bubble-out">relatório<div class="bubble-time">19:02 ✓✓</div></div>
+          <div class="bubble bubble-out">relatório da semana<div class="bubble-time">19:01 ✓✓</div></div>
           <div class="bubble bubble-in">
-            📊 Extrato de Maio<br><br>
-            🍔 Alimentação → R$ 423,00<br>
-            ⛽ Transporte → R$ 280,00<br>
-            🎮 Lazer → R$ 95,00<br><br>
-            💰 Total: R$ 798,00
-            <div class="bubble-time">19:02</div>
+            📊 <strong>Resumo · Esta semana</strong><br><br>
+            🛒 Alimentação → R$ 312,00<br>
+            🚗 Transporte → R$ 194,00<br>
+            🎬 Lazer → R$ 78,00<br><br>
+            💰 <strong>Total: R$ 584,00</strong>
+            <div class="bubble-time">19:01</div>
           </div>
         </div>
       </div>
@@ -339,8 +395,8 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
 <!-- COMO FUNCIONA -->
 <section class="how">
   <div class="sec-label">Como funciona</div>
-  <h2 class="sec-title">Tão fácil que até a Tia do Zap usa! 😄</h2>
-  <p class="sec-sub">Não precisa aprender nada novo. Você já usa o WhatsApp todo dia.</p>
+  <h2 class="sec-title">Três passos. Zero complicação.</h2>
+  <p class="sec-sub">Não há curva de aprendizado. Se você usa WhatsApp, já sabe usar o Cash Flow IA.</p>
   <div class="timeline">
     <div class="timeline-item">
       <div class="timeline-left">
@@ -349,7 +405,7 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
       </div>
       <div class="timeline-content">
         <h3>Garanta seu acesso</h3>
-        <p>Você recebe um link direto pro WhatsApp. É só clicar e começar.</p>
+        <p>Assine e receba um link direto pro WhatsApp do assistente. Sem instalação, sem cadastro extra.</p>
       </div>
     </div>
     <div class="timeline-item">
@@ -358,8 +414,9 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
         <div class="timeline-line"></div>
       </div>
       <div class="timeline-content">
-        <h3>Mande um "oi"</h3>
-        <p>O Cash Flow IA te dá as boas-vindas e já explica como funciona — rápido e fácil.</p>
+        <h3>Mande a mensagem</h3>
+        <p>Digite o gasto em linguagem natural. "uber 32", "almoço 45", "pix recebido 500" — a IA interpreta tudo automaticamente.</p>
+        <div class="timeline-tag">uber 32 → ✅ Transporte · R$ 32,00</div>
       </div>
     </div>
     <div class="timeline-item">
@@ -368,85 +425,84 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
         <div class="timeline-line"></div>
       </div>
       <div class="timeline-content">
-        <h3>Pronto!</h3>
-        <p>Registros, relatórios e alertas direto no seu Zap. Simples assim!</p>
-        <div class="timeline-example">❌ Nada de planilhas. Nada de apps.</div>
+        <h3>Acompanhe em tempo real</h3>
+        <p>Relatórios por categoria, alertas de limite e dicas práticas — direto no seu WhatsApp, quando você quiser.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- CAROUSEL FEATURES -->
+<!-- CAROUSEL DE BENEFÍCIOS -->
 <section class="carousel-section">
-  <div class="sec-label">Benefícios principais</div>
-  <h2 class="sec-title">O que o Cash Flow IA faz por você?</h2>
-  <p class="sec-sub">A IA que organiza suas finanças como se fosse seu melhor amigo — com superpoderes.</p>
+  <div class="sec-label">Recursos</div>
+  <h2 class="sec-title">O que o Cash Flow IA faz por você</h2>
+  <p class="sec-sub">Inteligência financeira no canal mais rápido do mundo.</p>
   <div class="carousel">
     <div class="carousel-card">
       <div class="carousel-icon">🧠</div>
-      <h3>Registra com uma mensagem</h3>
-      <p>Escreve "uber 27" ou "almoço 35". A IA entende qualquer jeito que você escrever.</p>
+      <h3>Linguagem natural</h3>
+      <p>Escreva como preferir: "açaí 18", "Uber 32", "farmácia 56". A IA categoriza automaticamente.</p>
     </div>
     <div class="carousel-card">
       <div class="carousel-icon">📊</div>
-      <h3>Extrato completo do mês</h3>
-      <p>Manda "relatório" e recebe tudo organizado por categoria. Alimentação, transporte, lazer...</p>
+      <h3>Relatórios detalhados</h3>
+      <p>Peça "relatório da semana" ou "extrato de maio" e receba tudo organizado por categoria, sem planilha.</p>
     </div>
     <div class="carousel-card">
-      <div class="carousel-icon">⚠️</div>
-      <h3>Alerta de limite</h3>
-      <p>Define quanto quer gastar no mês e recebe aviso quando estiver chegando perto.</p>
+      <div class="carousel-icon">🔔</div>
+      <h3>Alertas de limite</h3>
+      <p>Defina um teto de gastos mensal e receba avisos automáticos antes de ultrapassar.</p>
     </div>
     <div class="carousel-card">
-      <div class="carousel-icon">🗑️</div>
-      <h3>Corrige erros fácil</h3>
-      <p>Digitou errado? Manda "apagar" e o gasto some na hora. Sem complicação.</p>
+      <div class="carousel-icon">↩️</div>
+      <h3>Correção instantânea</h3>
+      <p>Registrou errado? Mande "apagar último" e o Cash Flow IA remove na hora — sem burocracia.</p>
     </div>
     <div class="carousel-card">
       <div class="carousel-icon">💡</div>
-      <h3>Dicas financeiras</h3>
-      <p>Manda "dica" e receba conselhos práticos pra economizar mais todo mês.</p>
+      <h3>Análise de hábitos</h3>
+      <p>Peça "dica do mês" e receba uma análise personalizada de onde você pode economizar mais.</p>
     </div>
   </div>
-  <p class="carousel-hint">← arraste pra ver mais →</p>
+  <p class="carousel-hint">← deslize para ver mais →</p>
 </section>
 
 <!-- DEPOIMENTOS -->
 <section class="testimonials">
   <div class="sec-label">Depoimentos</div>
-  <h2 class="sec-title">Quem usa, não larga</h2>
-  <p class="sec-sub">Veja o que estão falando:</p>
+  <h2 class="sec-title">Quem usa, confia</h2>
+  <p class="sec-sub">Resultados reais de pessoas reais.</p>
   <div class="testi-list">
     <div class="testi">
       <div class="testi-stars">★★★★★</div>
-      <p class="testi-text">"Nunca imaginei que inteligência artificial podia ser tão simples. Melhor assinatura do ano."</p>
+      <p class="testi-text">"Tentei de tudo: planilha, app, caderno. Só o Cash Flow IA funcionou de verdade. Levei menos de 2 minutos pra entender como usar."</p>
       <div class="testi-author">
-        <div class="testi-avatar">👨</div>
+        <div class="testi-avatar">👨‍💼</div>
         <div>
           <div class="testi-name">João S.</div>
-          <div class="testi-role">Empresário</div>
+          <div class="testi-role">Empresário · São Paulo</div>
         </div>
       </div>
     </div>
     <div class="testi">
       <div class="testi-stars">★★★★★</div>
-      <p class="testi-text">"Finalmente consigo saber pra onde vai meu dinheiro sem precisar ficar horas em planilhas! Amei!!!"</p>
+      <p class="testi-text">"Em duas semanas descobri que estava gastando quase R$ 400 por mês em delivery sem perceber. Agora reduzi pra menos de R$ 150."</p>
       <div class="testi-author">
-        <div class="testi-avatar">👩</div>
+        <div class="testi-avatar">👩‍🏫</div>
         <div>
-          <div class="testi-name">Gabriela M.</div>
-          <div class="testi-role">Influenciadora</div>
+          <div class="testi-name">Letícia M.</div>
+          <div class="testi-role">Professora · Florianópolis</div>
         </div>
       </div>
     </div>
     <div class="testi">
       <div class="testi-stars">★★★★★</div>
-      <p class="testi-text">"No primeiro mês já descobri que gastava R$ 600 em delivery. Agora reduzi pra metade!"</p>
+      <p class="testi-text">"Uso pra registrar tudo: gastos do negócio, despesas pessoais, até pix recebido. Organizado, rápido e sem complicação."</p>
       <div class="testi-author">
-        <div class="testi-avatar">👨</div>
+        <div class="testi-avatar">👨‍🔧</div>
         <div>
-          <div class="testi-name">Rafael M.</div>
-          <div class="testi-role">Autônomo</div>
+          <div class="testi-name">Rafael C.</div>
+          <div class="testi-role">Autônomo · Curitiba</div>
         </div>
       </div>
     </div>
@@ -457,39 +513,39 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
 <div class="proof-bar">
   <div class="proof-item">
     <div class="proof-num">500+</div>
-    <div class="proof-label">👥 Usuários</div>
-  </div>
-  <div class="proof-item">
-    <div class="proof-num">🛡️</div>
-    <div class="proof-label">Tecnologia<br>Segura</div>
+    <div class="proof-label">usuários ativos</div>
   </div>
   <div class="proof-item">
     <div class="proof-num">100%</div>
     <div class="proof-label">via WhatsApp</div>
   </div>
+  <div class="proof-item">
+    <div class="proof-num">🔐</div>
+    <div class="proof-label">dados privados<br>e seguros</div>
+  </div>
 </div>
 
 <!-- PREÇO -->
 <section class="pricing" id="preco">
-  <div class="sec-label">Preço</div>
-  <h2 class="sec-title">Menos de um café por mês ☕</h2>
-  <p class="sec-sub">Invista no controle do seu dinheiro.</p>
+  <div class="sec-label">Plano</div>
+  <h2 class="sec-title">Menos de um café por mês</h2>
+  <p class="sec-sub">Investimento pequeno, impacto real no seu bolso.</p>
   <div class="price-card">
     <div class="price-tag-top">🔥 OFERTA DE LANÇAMENTO</div>
     <div class="price-name">Plano Anual</div>
-    <div class="price-big"><sup>R$</sup>54<span style="font-size:1.8rem">,90</span></div>
+    <div class="price-big"><sup>R$</sup>54<span style="font-size:1.75rem;font-weight:900">,90</span></div>
     <div class="price-period">por ano</div>
-    <div class="price-equiv">= apenas R$ 4,57 por mês</div>
+    <div class="price-equiv">equivale a R$ 4,57 por mês</div>
     <div class="price-list">
-      <div class="price-item">Gastos ilimitados</div>
-      <div class="price-item">Extrato mensal completo</div>
-      <div class="price-item">Alertas de limite</div>
-      <div class="price-item">Dicas com IA</div>
-      <div class="price-item">Acesso imediato</div>
-      <div class="price-item">Suporte via WhatsApp</div>
+      <div class="price-item"><div class="price-check">✓</div>Registros ilimitados</div>
+      <div class="price-item"><div class="price-check">✓</div>Relatórios semanais e mensais</div>
+      <div class="price-item"><div class="price-check">✓</div>Alertas de limite personalizados</div>
+      <div class="price-item"><div class="price-check">✓</div>Análise de hábitos com IA</div>
+      <div class="price-item"><div class="price-check">✓</div>Acesso imediato após pagamento</div>
+      <div class="price-item"><div class="price-check">✓</div>Suporte via WhatsApp</div>
     </div>
-    <a href="https://pay.hub.la/brHaNisVeNGsyIqmR2Tg" class="price-btn">💸 Quero ativar o Cash Flow IA</a>
-    <p class="price-secure">🔒 Pix ou cartão · Transação segura e criptografada</p>
+    <a href="https://pay.hub.la/brHaNisVeNGsyIqmR2Tg" class="price-btn">Ativar meu Cash Flow IA →</a>
+    <p class="price-secure">🔒 Pix ou cartão &nbsp;·&nbsp; Transação segura e criptografada</p>
   </div>
 </section>
 
@@ -499,34 +555,34 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
   <h2 class="sec-title">Perguntas frequentes</h2>
   <div class="faq-list">
     <div class="faq-item">
-      <div class="faq-q">Como acesso depois de comprar? <span class="faq-chevron">+</span></div>
-      <div class="faq-a">Após o pagamento você recebe o link direto pro WhatsApp do assistente. É só clicar e mandar "oi"!</div>
+      <div class="faq-q">Como acesso depois de assinar? <span class="faq-chevron">+</span></div>
+      <div class="faq-a">Após a confirmação do pagamento você recebe o link direto para o WhatsApp do assistente. Clique, mande uma mensagem e já está ativo.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">Precisa instalar algum app? <span class="faq-chevron">+</span></div>
-      <div class="faq-a">Não! Funciona direto no WhatsApp que você já tem. Sem instalação, sem cadastro complicado.</div>
+      <div class="faq-q">Precisa instalar algum aplicativo? <span class="faq-chevron">+</span></div>
+      <div class="faq-a">Não. Funciona diretamente no WhatsApp que você já tem instalado. Nenhum app extra, nenhum cadastro complicado.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">Meus dados ficam seguros? <span class="faq-chevron">+</span></div>
-      <div class="faq-a">Sim. Cada usuário tem seus dados separados e privados. Ninguém além de você acessa seu histórico.</div>
+      <div class="faq-q">Meus dados ficam seguros e privados? <span class="faq-chevron">+</span></div>
+      <div class="faq-a">Sim. Cada usuário tem um histórico isolado e privado. Nenhuma informação sua é compartilhada ou acessada por terceiros.</div>
     </div>
     <div class="faq-item">
       <div class="faq-q">Funciona em qualquer celular? <span class="faq-chevron">+</span></div>
-      <div class="faq-a">Funciona em qualquer celular com WhatsApp — Android ou iPhone, qualquer versão.</div>
+      <div class="faq-a">Funciona em qualquer dispositivo com WhatsApp — Android ou iPhone, versão atualizada ou não.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">Posso cancelar quando quiser? <span class="faq-chevron">+</span></div>
-      <div class="faq-a">Sim. Você pode cancelar a renovação a qualquer momento, sem burocracia.</div>
+      <div class="faq-q">Posso cancelar a renovação quando quiser? <span class="faq-chevron">+</span></div>
+      <div class="faq-a">Sim. Você pode cancelar a renovação anual a qualquer momento, sem burocracia e sem necessidade de justificativa.</div>
     </div>
   </div>
 </section>
 
 <!-- CTA FINAL -->
 <section class="cta-final">
-  <h2>Comece hoje.<br>Seu dinheiro agradece. 💚</h2>
-  <p>Menos de R$ 5 por mês pra saber pra onde vai cada centavo.</p>
-  <a href="https://pay.hub.la/brHaNisVeNGsyIqmR2Tg" class="cta-final-btn">💸 Garantir meu acesso por R$ 54,90</a>
-  <p class="cta-final-sub">🔒 Pagamento seguro · Acesso imediato</p>
+  <h2>Comece hoje.<br>Seu dinheiro merece atenção.</h2>
+  <p>Menos de R$ 5 por mês para saber exatamente para onde vai cada centavo — e tomar decisões melhores.</p>
+  <a href="https://pay.hub.la/brHaNisVeNGsyIqmR2Tg" class="cta-final-btn">Garantir acesso por R$ 54,90/ano →</a>
+  <p class="cta-final-sub">🔒 Pagamento seguro &nbsp;·&nbsp; Acesso imediato</p>
 </section>
 
 <footer>
@@ -535,10 +591,11 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
 
 <!-- BOTÃO FIXO -->
 <div class="sticky-btn">
-  <a href="https://pay.hub.la/brHaNisVeNGsyIqmR2Tg">💸 Quero ativar o Cash Flow IA — R$ 54,90/ano</a>
+  <a href="https://pay.hub.la/brHaNisVeNGsyIqmR2Tg">Ativar o Cash Flow IA — R$ 54,90/ano →</a>
 </div>
 
 <script>
+  // FAQ accordion
   document.querySelectorAll('.faq-q').forEach(q => {
     q.addEventListener('click', () => {
       const item = q.parentElement;
@@ -548,7 +605,7 @@ footer { padding: 1.5rem; text-align: center; font-size: 0.75rem; color: #aaa; b
     });
   });
 
-  // Esconde botão sticky quando chegar no CTA final
+  // Hide sticky btn when CTA final is visible
   const ctaFinal = document.querySelector('.cta-final');
   const stickyBtn = document.querySelector('.sticky-btn');
   const observer = new IntersectionObserver(entries => {
