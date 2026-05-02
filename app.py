@@ -668,6 +668,23 @@ def webhook():
         elif intencao == "ajuda":
             resp.message(MSG_AJUDA)
 
+        # ── CONFIRMAÇÃO / PIX AMBÍGUO ───────────────────────────────────────────
+        elif intencao == "confirmacao":
+            val_str = f"R$ {valor:.2f}" if valor > 0 else "esse valor"
+            resp.message(
+                f"Esse pix de {val_str} foi uma *entrada* (recebido) ou *saída* (enviado)?\n\n"
+                "Me manda assim:\n"
+                "_pix recebido 100_ ou _pix enviado 100_ 😊"
+            )
+
+        # ── DÚVIDA / SIMULAÇÃO (NÃO REGISTRA) ─────────────────────────────────
+        elif intencao == "duvida":
+            resp.message(
+                "🤖 Parece que você quer simular ou calcular algo — mas ainda não registro esse tipo de consulta.\n\n"
+                "Se quiser *registrar* uma movimentação, manda assim:\n"
+                "_investimento 200_ · _salário 2500_ · _mercado 85_"
+            )
+
         # ── FALLBACK ───────────────────────────────────────────────────────────
         else:
             resp.message(
