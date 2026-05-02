@@ -1,413 +1,668 @@
+"""
+╔══════════════════════════════════════════════════════╗
+║           Cash Flow IA — WhatsApp Bot                ║
+║     Flask + Twilio + Groq + PostgreSQL/Supabase      ║
+╚══════════════════════════════════════════════════════╝
+
+Variáveis de ambiente necessárias:
+  DATABASE_URL   → postgresql://user:pass@host:5432/dbname
+  GROQ_API_KEY   → sua chave da API Groq
+  PORT           → (opcional) porta do servidor, padrão 5000
+"""
+
 import os
 import json
 import re
 import random
-from datetime import datetime
+import hashlib
+import logging
+from datetime import datetime, date, timedelta
+
+import psycopg2
+import psycopg2.extras
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-import sqlite3
 from groq import Groq
 
-app = Flask(__name__)
-groq_client = Groq(api_key=os.environ["GROQ_API_KEY"])
-DB_PATH = "/tmp/cashflow.db"
+# ─── SETUP ─────────────────────────────────────────────────────────────────────
 
-# ─── BANCO ─────────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+log = logging.getLogger("cashflow")
+
+app = Flask(__name__)
+
+groq_client = Groq(api_key=os.environ["GROQ_API_KEY"])
+DATABASE_URL = os.environ["DATABASE_URL"]
+
+# ─── BANCO — PostgreSQL / Supabase ─────────────────────────────────────────────
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS gastos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            telefone TEXT,
-            descricao TEXT,
-            valor REAL,
-            categoria TEXT,
-            data TEXT,
-            criado_em TEXT
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS limites (
-            telefone TEXT PRIMARY KEY,
-            limite_mensal REAL DEFAULT 0
-        )
-    """)
+    """Abre conexão com o PostgreSQL e garante que as tabelas existam."""
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transacoes (
+                id          SERIAL PRIMARY KEY,
+                telefone    TEXT        NOT NULL,
+                descricao   TEXT        NOT NULL,
+                valor       NUMERIC(12,2) NOT NULL,
+                tipo        TEXT        NOT NULL CHECK (tipo IN ('entrada','saida')),
+                categoria   TEXT        NOT NULL DEFAULT 'Outros',
+                data        DATE        NOT NULL,
+                criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS limites (
+                telefone        TEXT PRIMARY KEY,
+                limite_mensal   NUMERIC(12,2) NOT NULL DEFAULT 0
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_transacoes_telefone_data
+            ON transacoes (telefone, data)
+        """)
     conn.commit()
     return conn
 
-def gerar_id_curto(id_int):
-    """Gera ID curto tipo 'ae3f06' baseado no id do banco"""
-    import hashlib
-    h = hashlib.md5(str(id_int).encode()).hexdigest()
-    return h[:6]
 
-def salvar_gasto(telefone, descricao, valor, categoria):
-    conn = get_conn()
-    agora = datetime.now()
-    cursor = conn.execute(
-        "INSERT INTO gastos (telefone, descricao, valor, categoria, data, criado_em) VALUES (?, ?, ?, ?, ?, ?)",
-        (telefone, descricao, valor, categoria, agora.strftime("%Y-%m-%d"), agora.isoformat())
-    )
-    gasto_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return gasto_id
+def id_curto(pk: int) -> str:
+    """Hash MD5 curto de 6 chars baseado no PK da tabela."""
+    return hashlib.md5(str(pk).encode()).hexdigest()[:6]
 
-def apagar_por_id_curto(telefone, id_curto):
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT id, descricao, valor FROM gastos WHERE telefone=?", (telefone,))
-    todos = c.fetchall()
-    for row in todos:
-        if gerar_id_curto(row[0]) == id_curto.lower():
-            conn.execute("DELETE FROM gastos WHERE id=?", (row[0],))
-            conn.commit()
-            conn.close()
-            return row[1], row[2]
-    conn.close()
-    return None, None
 
-def apagar_ultimo(telefone):
+def salvar_transacao(telefone: str, descricao: str, valor: float,
+                     tipo: str, categoria: str) -> tuple[int, str]:
+    """Insere transação e retorna (pk, id_curto)."""
     conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT id, descricao, valor FROM gastos WHERE telefone=? ORDER BY id DESC LIMIT 1", (telefone,))
-    row = c.fetchone()
-    if row:
-        conn.execute("DELETE FROM gastos WHERE id=?", (row[0],))
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO transacoes (telefone, descricao, valor, tipo, categoria, data)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (telefone, descricao, valor, tipo, categoria, date.today())
+            )
+            pk = cur.fetchone()["id"]
         conn.commit()
+        return pk, id_curto(pk)
+    finally:
         conn.close()
-        return row[1], row[2]
-    conn.close()
-    return None, None
 
-def buscar_gastos_mes(telefone, mes=None, ano=None):
-    mes = mes or datetime.now().month
-    ano = ano or datetime.now().year
+
+def apagar_por_id_curto(telefone: str, short_id: str) -> tuple[str | None, float | None, str | None]:
+    """Apaga uma transação pelo id curto. Retorna (descricao, valor, tipo) ou (None, None, None)."""
     conn = get_conn()
-    c = conn.cursor()
-    c.execute(
-        "SELECT id, descricao, valor, categoria FROM gastos WHERE telefone=? AND strftime('%m', data)=? AND strftime('%Y', data)=? ORDER BY id",
-        (telefone, f"{mes:02d}", str(ano))
-    )
-    gastos = c.fetchall()
-    conn.close()
-    return gastos
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, descricao, valor, tipo FROM transacoes WHERE telefone = %s",
+                (telefone,)
+            )
+            rows = cur.fetchall()
+            for row in rows:
+                if id_curto(row["id"]) == short_id.lower():
+                    cur.execute("DELETE FROM transacoes WHERE id = %s", (row["id"],))
+                    conn.commit()
+                    return row["descricao"], float(row["valor"]), row["tipo"]
+        return None, None, None
+    finally:
+        conn.close()
 
-def buscar_total_mes(telefone):
-    gastos = buscar_gastos_mes(telefone)
-    return sum(g[2] for g in gastos)
 
-def buscar_limite(telefone):
+def apagar_ultimo(telefone: str) -> tuple[str | None, float | None, str | None]:
+    """Apaga o último registro do usuário. Retorna (descricao, valor, tipo)."""
     conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT limite_mensal FROM limites WHERE telefone=?", (telefone,))
-    row = c.fetchone()
-    conn.close()
-    return row[0] if row else 0
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, descricao, valor, tipo FROM transacoes WHERE telefone = %s ORDER BY id DESC LIMIT 1",
+                (telefone,)
+            )
+            row = cur.fetchone()
+            if row:
+                cur.execute("DELETE FROM transacoes WHERE id = %s", (row["id"],))
+                conn.commit()
+                return row["descricao"], float(row["valor"]), row["tipo"]
+        return None, None, None
+    finally:
+        conn.close()
 
-def salvar_limite(telefone, valor):
+
+def buscar_transacoes(telefone: str, data_ini: date, data_fim: date) -> list[dict]:
     conn = get_conn()
-    conn.execute("INSERT OR REPLACE INTO limites (telefone, limite_mensal) VALUES (?, ?)", (telefone, valor))
-    conn.commit()
-    conn.close()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, descricao, valor, tipo, categoria, data
+                FROM transacoes
+                WHERE telefone = %s AND data BETWEEN %s AND %s
+                ORDER BY data, id
+                """,
+                (telefone, data_ini, data_fim)
+            )
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def buscar_limite(telefone: str) -> float:
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT limite_mensal FROM limites WHERE telefone = %s", (telefone,))
+            row = cur.fetchone()
+            return float(row["limite_mensal"]) if row else 0.0
+    finally:
+        conn.close()
+
+
+def salvar_limite(telefone: str, valor: float):
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO limites (telefone, limite_mensal) VALUES (%s, %s) ON CONFLICT (telefone) DO UPDATE SET limite_mensal = EXCLUDED.limite_mensal",
+                (telefone, valor)
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ─── HELPERS DE PERÍODO ────────────────────────────────────────────────────────
+
+def periodo_hoje() -> tuple[date, date]:
+    hoje = date.today()
+    return hoje, hoje
+
+
+def periodo_semana() -> tuple[date, date]:
+    hoje = date.today()
+    return hoje - timedelta(days=hoje.weekday()), hoje
+
+
+def periodo_mes() -> tuple[date, date]:
+    hoje = date.today()
+    return hoje.replace(day=1), hoje
+
+
+def nome_mes(mes: int) -> str:
+    nomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+             "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
+    return nomes[mes - 1]
+
 
 # ─── IA ────────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """Voce e o CashFlow AI, assistente financeiro no WhatsApp. Personalidade: simpatico, jovem, brasileiro, animado.
+SYSTEM_PROMPT = """Você é o assistente financeiro Cash Flow IA no WhatsApp. Responda APENAS com JSON válido, sem texto extra, sem markdown.
 
-Responda APENAS em JSON exato sem nada fora:
-{"intencao": "gasto|relatorio|limite|ajuda|apagar|dica|oi|outro", "descricao": "nome do gasto", "valor": 0.0, "categoria": "Alimentacao|Transporte|Lazer|Saude|Moradia|Educacao|Beleza e Cuidados|Roupas|Outros"}
+Formato exato:
+{"intencao": "...", "descricao": "...", "valor": 0.0, "tipo": "entrada|saida", "categoria": "..."}
 
-Regras:
-- "uber 27", "ifood 45", "mercado 150", "agua 5", "almoco 35" = gasto
-- "relatorio", "resumo", "quanto gastei", "extrato" = relatorio
-- "limite 2000" = limite (extraia o valor numerico)
-- "oi", "ola", "bom dia", "ei" = oi
-- "apagar", "deletar", "errei", "erro" = apagar (valor=0)
-- "apagar abc123" = apagar com id_curto no campo descricao
-- "ajuda", "help", "comandos" = ajuda
-- "dica", "conselho" = dica
-- Categorize com inteligencia: uber/taxi/onibus=Transporte, ifood/restaurante/almoco=Alimentacao, farmacia=Saude, etc
-- Capitalize a primeira letra da categoria
-- SOMENTE JSON, sem backticks"""
+Valores de intencao permitidos:
+  gasto       → qualquer transação financeira (entrada ou saída)
+  relatorio   → "relatório", "resumo", "extrato", "quanto gastei"
+  hoje        → "hoje", "gastos hoje", "o que gastei hoje"
+  semana      → "semana", "essa semana", "esta semana"
+  saldo       → "saldo", "quanto tenho", "balanço"
+  top         → "top gastos", "maiores gastos", "onde gastei mais"
+  limite      → "limite 2000", "meta 1500"
+  apagar      → "apagar", "deletar", "errei", "desfazer"
+  dica        → "dica", "conselho", "como economizar"
+  ajuda       → "ajuda", "help", "comandos", "o que você faz"
+  oi          → saudações sem número
+  outro       → qualquer coisa que não se encaixe
 
-def processar_com_ia(mensagem):
-    response = groq_client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": mensagem}
-        ],
-        temperature=0.3
-    )
-    texto = response.choices[0].message.content.strip()
-    texto = re.sub(r"```json|```", "", texto).strip()
-    # Pega só o JSON mesmo que venha texto antes
-    match = re.search(r'\{.*\}', texto, re.DOTALL)
-    if match:
-        texto = match.group()
-    return json.loads(texto)
+Regras de tipo:
+  saida  → compras, gastos, despesas, pagamentos, contas, serviços
+  entrada → salário, freela, pix recebido, transferência recebida, renda, pagamento recebido, venda
 
-# ─── RELATORIO ─────────────────────────────────────────────────────────────────
+Categorias para saida:
+  Alimentação | Transporte | Lazer | Saúde | Moradia | Educação | Beleza e Cuidados | Roupas | Serviços | Outros
 
-def gerar_relatorio(telefone):
-    mes = datetime.now().month
-    ano = datetime.now().year
-    gastos = buscar_gastos_mes(telefone)
-    meses_nome = ["Janeiro","Fevereiro","Marco","Abril","Maio","Junho",
-                  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
+Categorias para entrada:
+  Salário | Freela | Vendas | Transferência | Outros
 
-    if not gastos:
+Exemplos:
+  "mercado 87"          → saida, Alimentação
+  "uber 32"             → saida, Transporte
+  "ifood 45"            → saida, Alimentação
+  "farmácia 60"         → saida, Saúde
+  "netflix 55"          → saida, Lazer
+  "pix recebido 500"    → entrada, Transferência
+  "salário 2500"        → entrada, Salário
+  "freela 800"          → entrada, Freela
+  "vendi tênis 200"     → entrada, Vendas
+
+SOMENTE JSON. Nenhum texto fora do JSON."""
+
+
+def processar_com_ia(mensagem: str) -> dict:
+    """Chama Groq/LLaMA e devolve dict parseado. Levanta ValueError se inválido."""
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": mensagem}
+            ],
+            temperature=0.2,
+            max_tokens=200
+        )
+        raw = response.choices[0].message.content.strip()
+        # Remove blocos markdown se existirem
+        raw = re.sub(r"```json|```", "", raw).strip()
+        # Extrai só o JSON
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if not match:
+            raise ValueError(f"Nenhum JSON encontrado na resposta: {raw!r}")
+        resultado = json.loads(match.group())
+        # Garante campos obrigatórios
+        resultado.setdefault("intencao", "outro")
+        resultado.setdefault("descricao", mensagem)
+        resultado.setdefault("valor", 0.0)
+        resultado.setdefault("tipo", "saida")
+        resultado.setdefault("categoria", "Outros")
+        return resultado
+    except json.JSONDecodeError as e:
+        log.error("JSON inválido da IA: %s", e)
+        raise ValueError(f"Resposta da IA inválida: {e}")
+
+
+# ─── RELATÓRIOS ────────────────────────────────────────────────────────────────
+
+EMOJIS_CAT = {
+    "alimentação": "🍔",
+    "transporte":  "🚗",
+    "lazer":       "🎮",
+    "saúde":       "💊",
+    "moradia":     "🏠",
+    "educação":    "📚",
+    "roupas":      "👕",
+    "beleza e cuidados": "💅",
+    "serviços":    "🔧",
+    "salário":     "💼",
+    "freela":      "💻",
+    "vendas":      "🛍️",
+    "transferência": "📲",
+    "outros":      "📦",
+}
+
+
+def emoji_cat(cat: str) -> str:
+    return EMOJIS_CAT.get(cat.lower(), "📦")
+
+
+def barra_progresso(porcentagem: int, tamanho: int = 10) -> str:
+    cheio = min(porcentagem // (100 // tamanho), tamanho)
+    return "█" * cheio + "░" * (tamanho - cheio)
+
+
+def formatar_relatorio(titulo: str, label_ini: str, label_fim: str,
+                        transacoes: list[dict], limite: float = 0) -> str:
+    if not transacoes:
         return (
-            f"📭 *Nenhum gasto em {meses_nome[mes-1]}/{ano}*\n\n"
-            "Registre seu primeiro gasto agora!\n"
-            "Ex: _mercado 150_ ou _uber 27_"
+            f"📭 *{titulo}*\n\n"
+            "Nenhuma transação encontrada neste período.\n\n"
+            "Registre um gasto: _mercado 85_ ou uma entrada: _pix recebido 500_"
         )
 
-    categorias = {}
-    for gid, desc, valor, cat in gastos:
-        categorias.setdefault(cat, []).append((gid, desc, valor))
+    entradas = [t for t in transacoes if t["tipo"] == "entrada"]
+    saidas   = [t for t in transacoes if t["tipo"] == "saida"]
 
-    total = sum(g[2] for g in gastos)
-    qtd = len(gastos)
+    total_ent  = sum(float(t["valor"]) for t in entradas)
+    total_sai  = sum(float(t["valor"]) for t in saidas)
+    saldo      = total_ent - total_sai
 
-    emojis = {
-        "alimentacao":"🍔","transporte":"🚗","lazer":"🎮","saude":"💊",
-        "moradia":"🏠","educacao":"📚","roupas":"👕","beleza e cuidados":"💅",
-        "outros":"📦"
-    }
-
-    def get_emoji(cat):
-        return emojis.get(cat.lower(), "📦")
-
-    inicio_mes = f"01/{mes:02d}/{ano}"
-    hoje = datetime.now().strftime("%d/%m/%Y")
+    # Agrupa saídas por categoria
+    cats: dict[str, list] = {}
+    for t in saidas:
+        cats.setdefault(t["categoria"], []).append(t)
 
     linhas = [
-        f"🧾 *Extrato Financeiro*",
-        f"Período: {inicio_mes} a {hoje}\n"
+        f"📊 *{titulo}*",
+        f"Período: {label_ini} → {label_fim}\n",
     ]
 
-    for cat, itens in sorted(categorias.items(), key=lambda x: -sum(i[2] for i in x[1])):
-        subtotal = sum(i[2] for i in itens)
-        linhas.append(f"{get_emoji(cat)} *{cat}* (R$ {subtotal:.2f})")
-        for gid, desc, val in itens:
-            id_curto = gerar_id_curto(gid)
-            linhas.append(f"  {desc}: R$ {val:.2f}  |  ID: {id_curto}")
+    # Entradas (resumido)
+    if entradas:
+        linhas.append("💚 *Entradas*")
+        for t in entradas:
+            short = id_curto(t["id"])
+            linhas.append(f"  {t['descricao'].capitalize()}: R$ {float(t['valor']):.2f}  ·  _{short}_")
+        linhas.append(f"  *Total entradas: R$ {total_ent:.2f}*\n")
 
-    linhas.append(f"\n💰 *Total: R$ {total:.2f}* ({qtd} gastos)")
+    # Saídas por categoria
+    if saidas:
+        linhas.append("🔴 *Saídas por categoria*")
+        for cat, itens in sorted(cats.items(), key=lambda x: -sum(float(i["valor"]) for i in x[1])):
+            subtotal = sum(float(i["valor"]) for i in itens)
+            linhas.append(f"\n{emoji_cat(cat)} *{cat}* — R$ {subtotal:.2f}")
+            for t in itens:
+                short = id_curto(t["id"])
+                linhas.append(f"  {t['descricao'].capitalize()}: R$ {float(t['valor']):.2f}  ·  _{short}_")
+        linhas.append(f"\n  *Total saídas: R$ {total_sai:.2f}*")
 
-    limite = buscar_limite(telefone)
+    # Saldo
+    saldo_emoji = "🟢" if saldo >= 0 else "🔴"
+    linhas.append(f"\n{saldo_emoji} *Saldo do período: R$ {saldo:+.2f}*")
+
+    # Limite mensal (só em relatório de mês)
     if limite > 0:
-        restante = limite - total
-        porcentagem = int((total / limite) * 100)
-        barra = "█" * min(porcentagem // 10, 10) + "░" * (10 - min(porcentagem // 10, 10))
+        porc = int((total_sai / limite) * 100) if limite > 0 else 0
+        barra = barra_progresso(porc)
+        restante = limite - total_sai
+        linhas.append(f"\n⚠️ *Limite mensal: R$ {limite:.2f}*")
+        linhas.append(f"[{barra}] {porc}% usado")
         if restante >= 0:
-            linhas.append(f"\n📊 [{barra}] {porcentagem}% do limite")
-            linhas.append(f"✅ Sobram R$ {restante:.2f}")
+            linhas.append(f"✅ Disponível: R$ {restante:.2f}")
         else:
-            linhas.append(f"\n📊 [{barra}] {porcentagem}%")
-            linhas.append(f"🚨 Passou em R$ {abs(restante):.2f}!")
+            linhas.append(f"🚨 Estourou em R$ {abs(restante):.2f}!")
     else:
-        linhas.append(f"\n💡 _Defina um limite: limite 2000_")
+        linhas.append("\n💡 _Defina um limite: limite 2000_")
 
-    linhas.append(f"\n🗑️ _Para apagar: apagar + ID do gasto_")
-    linhas.append(f"_Ex: apagar ae3f06_")
+    linhas.append("\n🗑️ _Apagar: apagar + ID (ex: apagar ae3f06)_")
 
     return "\n".join(linhas)
+
+
+def relatorio_top(telefone: str, n: int = 5) -> str:
+    ini, fim = periodo_mes()
+    transacoes = buscar_transacoes(telefone, ini, fim)
+    saidas = sorted(
+        [t for t in transacoes if t["tipo"] == "saida"],
+        key=lambda x: -float(x["valor"])
+    )
+    if not saidas:
+        return "📭 Nenhuma saída registrada este mês."
+
+    linhas = [f"🏆 *Top {n} maiores saídas do mês:*\n"]
+    for i, t in enumerate(saidas[:n], 1):
+        linhas.append(f"{i}. {t['descricao'].capitalize()} — R$ {float(t['valor']):.2f}  ({t['categoria']})")
+    return "\n".join(linhas)
+
+
+def relatorio_saldo(telefone: str) -> str:
+    ini, fim = periodo_mes()
+    transacoes = buscar_transacoes(telefone, ini, fim)
+    total_ent = sum(float(t["valor"]) for t in transacoes if t["tipo"] == "entrada")
+    total_sai = sum(float(t["valor"]) for t in transacoes if t["tipo"] == "saida")
+    saldo = total_ent - total_sai
+    emoji = "🟢" if saldo >= 0 else "🔴"
+    mes = nome_mes(ini.month)
+    return (
+        f"💰 *Saldo — {mes}*\n\n"
+        f"💚 Entradas: R$ {total_ent:.2f}\n"
+        f"🔴 Saídas:   R$ {total_sai:.2f}\n"
+        f"─────────────────\n"
+        f"{emoji} *Saldo: R$ {saldo:+.2f}*"
+    )
+
 
 # ─── MENSAGENS FIXAS ───────────────────────────────────────────────────────────
 
 MSG_BEM_VINDO = (
-    "👋 Oi! Seja bem-vindo ao *CashFlow AI!* 🤖💸\n\n"
-    "Serei seu assistente financeiro pessoal aqui no WhatsApp.\n\n"
-    "É simples assim:\n\n"
-    "💬 *Registre seus gastos:*\n"
-    "Só manda o nome e o valor\n"
-    "_uber 27_ • _almoço 35.90_ • _mercado 200_\n\n"
-    "📊 *Veja seu relatório:*\n"
-    "_relatório_ ou _resumo_\n\n"
-    "⚠️ *Defina um limite mensal:*\n"
+    "👋 Olá! Bem-vindo ao *Cash Flow IA* 💸\n\n"
+    "Seu assistente financeiro pessoal no WhatsApp.\n\n"
+    "━━━━━━━━━━━━━━━━━━\n"
+    "📤 *Registrar saída:*\n"
+    "_mercado 87_ · _uber 32_ · _netflix 55_\n\n"
+    "📥 *Registrar entrada:*\n"
+    "_salário 2500_ · _pix recebido 300_\n\n"
+    "📊 *Ver relatórios:*\n"
+    "_hoje_ · _semana_ · _mês_ · _saldo_\n\n"
+    "🏆 *Ver maiores gastos:*\n"
+    "_top gastos_\n\n"
+    "⚠️ *Definir limite mensal:*\n"
     "_limite 2000_\n\n"
-    "❓ *Precisa de ajuda?*\n"
-    "_ajuda_ ou _comandos_\n\n"
-    "Agora me conta: qual foi seu último gasto? 😄"
+    "❓ _ajuda_ para ver todos os comandos\n"
+    "━━━━━━━━━━━━━━━━━━\n"
+    "Qual foi sua última movimentação? 😊"
 )
 
 MSG_AJUDA = (
-    "🤖 *CashFlow AI — Comandos:*\n\n"
-    "💬 *Registrar gasto:*\n"
-    "_uber 27_ • _almoço 35.90_ • _mercado 200_\n\n"
-    "📊 *Ver extrato do mês:*\n"
-    "_relatório_ ou _resumo_\n\n"
-    "⚠️ *Definir limite mensal:*\n"
-    "_limite 2000_\n\n"
-    "🗑️ *Apagar último gasto:*\n"
-    "_apagar_\n\n"
-    "🗑️ *Apagar gasto por ID:*\n"
-    "_apagar ae3f06_ (ID aparece no extrato)\n\n"
-    "💡 *Pedir uma dica:*\n"
-    "_dica_\n\n"
-    "Qualquer dúvida é só chamar! 💸"
+    "🤖 *Cash Flow IA — Comandos*\n\n"
+    "━━━━━━━━━━━━━━━━━━\n"
+    "📤 *Saída:* _mercado 85_ · _uber 32_\n"
+    "📥 *Entrada:* _salário 2500_ · _pix recebido 400_\n\n"
+    "📊 *Relatórios:*\n"
+    "  _hoje_ — movimentações de hoje\n"
+    "  _semana_ — esta semana\n"
+    "  _mês_ — mês atual completo\n"
+    "  _saldo_ — balanço do mês\n"
+    "  _top gastos_ — maiores saídas\n\n"
+    "⚠️ *Limite mensal:* _limite 2000_\n\n"
+    "🗑️ *Apagar último:* _apagar_\n"
+    "🗑️ *Apagar por ID:* _apagar ae3f06_\n\n"
+    "💡 *Dica financeira:* _dica_\n"
+    "━━━━━━━━━━━━━━━━━━"
 )
 
 DICAS = [
-    "💡 Sabia que anotar os gastos já é metade da batalha? Quem sabe pra onde vai o dinheiro consegue controlar. Continue assim! 💪",
-    "💡 Dica de ouro: defina um limite mensal! Manda _limite 2000_. Assim você fica de olho no progresso 👀",
-    "💡 Antes de uma compra por impulso, espera 24h. Se ainda quiser depois, pode comprar sem culpa 😄",
-    "💡 Separar uma % fixa pra lazer evita aquela sensação de culpa na hora de gastar. Lazer faz parte da vida!",
-    "💡 Gastos pequenos são traiçoeiros! Um cafezinho por dia = ~R$ 100/mês. Não precisa cortar, só saber que existe 😉",
-    "💡 Meta simples que funciona: toda vez que gastar algo, registra aqui. Só isso já muda o jogo.",
+    "💡 *Regra 50/30/20:* 50% pra necessidades, 30% pra lazer e 20% pra poupar. Simples e eficaz!",
+    "💡 Registrar cada gasto já é metade do controle. Quem sabe pra onde vai o dinheiro consegue direcionar. 💪",
+    "💡 Pequenos gastos somam muito. Um café por dia pode ser ~R$ 100/mês. Não precisa cortar — só saber que existe.",
+    "💡 Espere 24h antes de uma compra por impulso. Se ainda quiser depois, compre sem culpa. 😄",
+    "💡 *Dica rápida:* defina um limite mensal aqui. Manda _limite 2000_ e eu aviso quando estiver chegando perto!",
+    "💡 Separar uma % fixa para lazer evita a culpa de gastar com o que você gosta. Lazer faz parte do orçamento!",
+    "💡 Revise assinaturas mensais (streaming, apps). É comum pagar por serviços que mal usa.",
 ]
 
 SAUDACOES = [
-    "Oi! 🤖 Tô aqui! Manda um gasto ou _ajuda_ pra ver tudo que faço 💸",
-    "Olá! Pronto pra te ajudar com suas finanças 💰 Manda um gasto ou _relatório_!",
-    "Ei! 🤖 Me manda um gasto, tipo _mercado 80_, e eu anoto na hora!",
+    "👋 Olá! Tudo bem? Registre um gasto ou mande _mês_ pra ver seu extrato. 💸",
+    "Oi! 🤖 Pode mandar: _mercado 80_ pra registrar, ou _saldo_ pra ver seu balanço.",
+    "Olá! Pronto pra te ajudar com as finanças. 💰 Qual foi a última movimentação?",
 ]
+
 
 # ─── WEBHOOK ───────────────────────────────────────────────────────────────────
 
+PALAVRAS_BEM_VINDO = {
+    "oi", "olá", "ola", "hello", "hi", "hey",
+    "inicio", "início", "start", "começar", "comecar"
+}
+
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    telefone = request.form.get("From", "")
+    telefone = request.form.get("From", "").strip()
     mensagem = request.form.get("Body", "").strip()
     resp = MessagingResponse()
 
-    if not mensagem:
+    if not mensagem or not telefone:
         return str(resp)
 
-    # Detecta primeiro acesso por palavras de saudação sem número
-    palavras_boas_vindas = ["oi", "olá", "ola", "hello", "hi", "inicio", "início", "start", "começar", "comecar"]
-    msg_lower = mensagem.lower().strip()
+    log.info("MSG de %s: %s", telefone, mensagem)
 
-    if msg_lower in palavras_boas_vindas:
+    # Atalho para bem-vindo
+    if mensagem.lower() in PALAVRAS_BEM_VINDO:
         resp.message(MSG_BEM_VINDO)
         return str(resp)
 
     try:
         resultado = processar_com_ia(mensagem)
-        intencao = resultado.get("intencao", "outro")
+    except ValueError as e:
+        log.error("Erro ao processar IA: %s", e)
+        resp.message(
+            "🤖 Não consegui entender sua mensagem.\n\n"
+            "Tente algo como:\n"
+            "_mercado 85_ · _uber 32_ · _salário 2500_\n\n"
+            "Ou mande _ajuda_ para ver todos os comandos."
+        )
+        return str(resp)
 
-        # ── GASTO ──
+    intencao  = resultado.get("intencao", "outro")
+    valor     = float(resultado.get("valor", 0) or 0)
+    tipo      = resultado.get("tipo", "saida").strip().lower()
+    descricao = resultado.get("descricao", mensagem).strip().capitalize()
+    categoria = resultado.get("categoria", "Outros").strip()
+
+    try:
+        # ── GASTO / ENTRADA ────────────────────────────────────────────────────
         if intencao == "gasto":
-            valor = resultado.get("valor", 0)
-            descricao = resultado.get("descricao", mensagem).strip().capitalize()
-            categoria = resultado.get("categoria", "Outros").strip()
-
-            if valor > 0:
-                gasto_id = salvar_gasto(telefone, descricao, valor, categoria)
-                id_curto = gerar_id_curto(gasto_id)
-                total_mes = buscar_total_mes(telefone)
-                limite = buscar_limite(telefone)
-                hoje = datetime.now().strftime("%d/%m/%Y")
-
-                # Monta resposta no estilo da imagem
-                msg = (
-                    f"✅ *Novo Gasto Registrado!*\n\n"
-                    f"📝 Descrição: {descricao}\n"
-                    f"🏷️ Categoria: {categoria}\n"
-                    f"💰 Valor: R$ {valor:.2f}\n"
-                    f"📅 Data: {hoje}\n"
-                    f"🔑 ID: {id_curto}\n\n"
-                    f"🗑️ Para apagar: _apagar {id_curto}_"
-                )
-
-                # Alerta de limite
-                if limite > 0:
-                    porcentagem = int((total_mes / limite) * 100)
-                    if total_mes > limite:
-                        msg += f"\n\n🚨 *Limite estourado!* Você gastou R$ {total_mes:.2f} de R$ {limite:.2f}"
-                    elif porcentagem >= 90:
-                        msg += f"\n\n⚠️ *Atenção!* Você já usou {porcentagem}% do limite mensal!"
-                    elif porcentagem >= 75:
-                        msg += f"\n\n💛 Você já usou {porcentagem}% do limite. Fica de olho!"
-
-                resp.message(msg)
-
-            else:
+            if valor <= 0:
                 resp.message(
-                    "🤖 Não consegui identificar o valor!\n\n"
-                    "Me manda assim:\n"
-                    "_mercado 85.50_ ou _uber 27_"
+                    "🤖 Não identifiquei o valor!\n\n"
+                    "Exemplos:\n"
+                    "_mercado 85.50_ · _pix recebido 300_"
                 )
+                return str(resp)
 
-        # ── RELATÓRIO ──
-        elif intencao == "relatorio":
-            resp.message(gerar_relatorio(telefone))
+            pk, short = salvar_transacao(telefone, descricao, valor, tipo, categoria)
 
-        # ── LIMITE ──
+            if tipo == "entrada":
+                icone, label = "💚", "Entrada Registrada"
+            else:
+                icone, label = "🔴", "Saída Registrada"
+
+            msg = (
+                f"{icone} *{label}*\n\n"
+                f"📝 {descricao}\n"
+                f"🏷️ {categoria}\n"
+                f"💰 R$ {valor:.2f}\n"
+                f"📅 {date.today().strftime('%d/%m/%Y')}\n"
+                f"🔑 ID: {short}\n\n"
+                f"🗑️ _Para apagar: apagar {short}_"
+            )
+
+            # Alertas de limite (somente para saídas)
+            if tipo == "saida":
+                limite = buscar_limite(telefone)
+                if limite > 0:
+                    ini, fim = periodo_mes()
+                    txs = buscar_transacoes(telefone, ini, fim)
+                    total_sai = sum(float(t["valor"]) for t in txs if t["tipo"] == "saida")
+                    porc = int((total_sai / limite) * 100)
+                    if total_sai > limite:
+                        msg += f"\n\n🚨 *Limite estourado!* R$ {total_sai:.2f} de R$ {limite:.2f}"
+                    elif porc >= 90:
+                        msg += f"\n\n⚠️ *Atenção!* {porc}% do limite mensal usado."
+                    elif porc >= 75:
+                        msg += f"\n\n💛 {porc}% do limite usado — fique de olho!"
+
+            resp.message(msg)
+
+        # ── HOJE ───────────────────────────────────────────────────────────────
+        elif intencao == "hoje":
+            ini, fim = periodo_hoje()
+            txs = buscar_transacoes(telefone, ini, fim)
+            label = date.today().strftime("%d/%m/%Y")
+            resp.message(formatar_relatorio("Movimentações de Hoje", label, label, txs))
+
+        # ── SEMANA ─────────────────────────────────────────────────────────────
+        elif intencao == "semana":
+            ini, fim = periodo_semana()
+            txs = buscar_transacoes(telefone, ini, fim)
+            resp.message(formatar_relatorio(
+                "Esta Semana",
+                ini.strftime("%d/%m"), fim.strftime("%d/%m/%Y"), txs
+            ))
+
+        # ── MÊS / RELATÓRIO ────────────────────────────────────────────────────
+        elif intencao in ("relatorio", "mês"):
+            ini, fim = periodo_mes()
+            txs = buscar_transacoes(telefone, ini, fim)
+            limite = buscar_limite(telefone)
+            mes_label = f"{nome_mes(ini.month)}/{ini.year}"
+            resp.message(formatar_relatorio(
+                f"Extrato — {mes_label}",
+                ini.strftime("%d/%m"), fim.strftime("%d/%m/%Y"),
+                txs, limite
+            ))
+
+        # ── SALDO ──────────────────────────────────────────────────────────────
+        elif intencao == "saldo":
+            resp.message(relatorio_saldo(telefone))
+
+        # ── TOP GASTOS ─────────────────────────────────────────────────────────
+        elif intencao == "top":
+            resp.message(relatorio_top(telefone))
+
+        # ── LIMITE ─────────────────────────────────────────────────────────────
         elif intencao == "limite":
-            valor = resultado.get("valor", 0)
             if valor > 0:
                 salvar_limite(telefone, valor)
-                total_mes = buscar_total_mes(telefone)
-                porcentagem = int((total_mes / valor) * 100) if valor > 0 else 0
+                ini, fim = periodo_mes()
+                txs = buscar_transacoes(telefone, ini, fim)
+                total_sai = sum(float(t["valor"]) for t in txs if t["tipo"] == "saida")
+                porc = int((total_sai / valor) * 100) if valor > 0 else 0
                 resp.message(
-                    f"✅ *Limite mensal definido: R$ {valor:.2f}*\n\n"
-                    f"Você já gastou R$ {total_mes:.2f} esse mês ({porcentagem}% do limite).\n\n"
-                    f"🤖 Vou te avisar quando estiver chegando perto!"
+                    f"✅ *Limite mensal: R$ {valor:.2f}*\n\n"
+                    f"Saídas este mês: R$ {total_sai:.2f} ({porc}%)\n\n"
+                    f"Vou te avisar ao se aproximar do limite! 🔔"
                 )
             else:
-                resp.message("🤖 Qual o valor do limite? Ex: *limite 2000*")
+                resp.message("🤖 Informe o valor. Ex: *limite 2000*")
 
-        # ── APAGAR ──
+        # ── APAGAR ─────────────────────────────────────────────────────────────
         elif intencao == "apagar":
-            descricao_raw = resultado.get("descricao", "").strip()
-            # Verifica se veio um ID na mensagem
-            partes = mensagem.strip().split()
-            id_curto = None
-            for p in partes:
-                if len(p) == 6 and re.match(r'^[a-f0-9]+$', p.lower()):
-                    id_curto = p.lower()
-                    break
-
-            if id_curto:
-                desc, val = apagar_por_id_curto(telefone, id_curto)
+            # Procura ID de 6 chars hexadecimais na mensagem original
+            match = re.search(r'\b([a-f0-9]{6})\b', mensagem.lower())
+            if match:
+                desc, val, tp = apagar_por_id_curto(telefone, match.group(1))
             else:
-                desc, val = apagar_ultimo(telefone)
+                desc, val, tp = apagar_ultimo(telefone)
 
             if desc:
-                total_mes = buscar_total_mes(telefone)
+                icone = "💚" if tp == "entrada" else "🔴"
+                ini, fim = periodo_mes()
+                txs = buscar_transacoes(telefone, ini, fim)
+                total_sai = sum(float(t["valor"]) for t in txs if t["tipo"] == "saida")
+                total_ent = sum(float(t["valor"]) for t in txs if t["tipo"] == "entrada")
                 resp.message(
-                    f"🗑️ *Gasto removido:*\n"
-                    f"_{desc}_ — R$ {val:.2f}\n\n"
-                    f"💰 Total do mês: R$ {total_mes:.2f}"
+                    f"🗑️ *Removido:* {desc.capitalize()} ({icone} R$ {val:.2f})\n\n"
+                    f"💚 Entradas: R$ {total_ent:.2f}\n"
+                    f"🔴 Saídas:   R$ {total_sai:.2f}"
                 )
             else:
-                resp.message("🤖 Nenhum gasto encontrado para apagar!")
+                resp.message("🤖 Nenhuma transação encontrada para apagar.")
 
-        # ── DICA ──
+        # ── DICA ───────────────────────────────────────────────────────────────
         elif intencao == "dica":
             resp.message(random.choice(DICAS))
 
-        # ── OI ──
+        # ── OI ─────────────────────────────────────────────────────────────────
         elif intencao == "oi":
             resp.message(random.choice(SAUDACOES))
 
-        # ── AJUDA ──
+        # ── AJUDA ──────────────────────────────────────────────────────────────
         elif intencao == "ajuda":
             resp.message(MSG_AJUDA)
 
+        # ── FALLBACK ───────────────────────────────────────────────────────────
         else:
             resp.message(
-                "🤖 Não entendi muito bem!\n\n"
-                "Tenta:\n"
-                "_mercado 50_ → registrar gasto\n"
-                "_relatório_ → ver extrato\n"
+                "🤖 Não entendi!\n\n"
+                "Exemplos:\n"
+                "_mercado 85_ → registrar saída\n"
+                "_salário 2500_ → registrar entrada\n"
+                "_mês_ → extrato mensal\n"
                 "_ajuda_ → ver todos os comandos"
             )
 
     except Exception as e:
-        print(f"Erro: {e}")
-        resp.message("🤖 Ops, deu um erro aqui! Tenta de novo em instantes.")
+        log.exception("Erro no webhook: %s", e)
+        resp.message(
+            "🤖 Ops, algo deu errado! Por favor, tente novamente em instantes.\n\n"
+            "Se o problema persistir, mande _ajuda_."
+        )
 
     return str(resp)
 
+
 @app.route("/", methods=["GET"])
 def health():
-    return "CashFlow AI rodando! 🤖🚀"
+    return {"status": "ok", "app": "Cash Flow IA", "version": "2.0"}, 200
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
