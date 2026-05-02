@@ -410,21 +410,16 @@ def relatorio_saldo(telefone: str) -> str:
 # ─── MENSAGENS FIXAS ───────────────────────────────────────────────────────────
 
 MSG_BEM_VINDO = (
-    "👋 Olá! Bem-vindo ao *Cash Flow IA* 💸\n\n"
-    "Seu assistente financeiro pessoal no WhatsApp.\n\n"
-    "━━━━━━━━━━━━━━━━━━\n"
-    "📤 *Registrar saída:*\n"
-    "_mercado 87_ · _uber 32_ · _netflix 55_\n\n"
-    "📥 *Registrar entrada:*\n"
-    "_salário 2500_ · _pix recebido 300_\n\n"
-    "📊 *Ver relatórios:*\n"
-    "_hoje_ · _semana_ · _mês_ · _saldo_\n\n"
-    "🏆 *Ver maiores gastos:*\n"
-    "_top gastos_\n\n"
-    "⚠️ *Definir limite mensal:*\n"
-    "_limite 2000_\n\n"
-    "❓ _ajuda_ para ver todos os comandos\n"
-    "━━━━━━━━━━━━━━━━━━\n"
+    "Oi! 👋 Eu sou o *Cash Flow IA*, seu assistente financeiro aqui no WhatsApp.\n\n"
+    "É simples: me manda o que gastou ou recebeu, e eu anoto tudo pra você.\n\n"
+    "*Exemplos rápidos:*\n"
+    "• _mercado 87_ → saída\n"
+    "• _uber 32_ → saída\n"
+    "• _investimento 50_ → saída\n"
+    "• _salário 2500_ → entrada\n"
+    "• _pix recebido 300_ → entrada\n"
+    "• _retorno investimento 200_ → entrada\n\n"
+    "Pra ver seu extrato, é só mandar _mês_, _hoje_ ou _saldo_.\n\n"
     "Qual foi sua última movimentação? 😊"
 )
 
