@@ -23,6 +23,7 @@ import psycopg2
 import psycopg2.extras
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.rest import Client as TwilioClient
 from groq import Groq
 
 # ═══════════════════════════════════════════════════════════════
@@ -38,6 +39,36 @@ log = logging.getLogger("cashflow")
 app = Flask(__name__)
 groq_client = Groq(api_key=os.environ["GROQ_API_KEY"])
 DATABASE_URL = os.environ["DATABASE_URL"]
+
+# Twilio oficial: no número aprovado, a resposta é enviada ativamente pela API.
+twilio_client = TwilioClient(
+    os.environ["TWILIO_ACCOUNT_SID"],
+    os.environ["TWILIO_AUTH_TOKEN"]
+)
+TWILIO_NUMBER = os.environ.get("TWILIO_NUMBER", "whatsapp:+12297854383")
+
+
+def enviar_whatsapp(telefone: str, mensagem: str):
+    """Envia uma mensagem ativa pelo WhatsApp oficial da Twilio."""
+    twilio_client.messages.create(
+        from_=TWILIO_NUMBER,
+        to=telefone,
+        body=mensagem
+    )
+
+
+class ActiveWhatsAppResponse:
+    """Compatível com resp.message(...), mas envia pela API ativa da Twilio."""
+    def __init__(self, telefone: str):
+        self.telefone = telefone
+
+    def message(self, mensagem: str):
+        if self.telefone and mensagem:
+            enviar_whatsapp(self.telefone, mensagem)
+
+    def __str__(self):
+        # Twilio só precisa receber HTTP 200; a resposta já foi enviada pela API.
+        return ""
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -683,7 +714,7 @@ PALAVRAS_BEM_VINDO = {
 def webhook():
     telefone = request.form.get("From", "").strip()
     mensagem = request.form.get("Body", "").strip()
-    resp = MessagingResponse()
+    resp = ActiveWhatsAppResponse(telefone)
 
     if not mensagem or not telefone:
         return str(resp)
