@@ -22,8 +22,9 @@ nav {
   display: flex; align-items: center; gap: 0.5rem;
 }
 .logo img.brand-logo {
-  height: 32px; width: auto; object-fit: contain;
+  height: 34px; width: 34px; object-fit: cover; border-radius: 9px;
 }
+.brand-name { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1rem; color: #0a0a0a; letter-spacing: -0.01em; }
 .nav-btn {
   background: #16a34a; color: #fff; font-family: 'Sora', sans-serif;
   font-weight: 700; font-size: 0.8rem;
@@ -207,10 +208,11 @@ section { padding: 3.5rem 1.4rem; }
 .testi-text { font-size: 0.9rem; color: #374151; line-height: 1.65; margin-bottom: 1rem; }
 .testi-author { display: flex; align-items: center; gap: 0.7rem; }
 .testi-avatar {
-  width: 40px; height: 40px; border-radius: 50%;
+  width: 44px; height: 44px; border-radius: 50%;
   background: #f0fdf4; display: flex; align-items: center; justify-content: center;
-  font-size: 1.2rem; border: 2px solid #d1fae5; flex-shrink: 0;
+  font-size: 1.2rem; border: 2px solid #d1fae5; flex-shrink: 0; overflow: hidden;
 }
+.testi-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .testi-name { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.87rem; }
 .testi-role { font-size: 0.73rem; color: #9ca3af; }
 
@@ -334,7 +336,8 @@ footer {
 <!-- NAV -->
 <nav>
   <div class="logo">
-    <img src="cashflow-logo.png" alt="Cash Flow IA" class="brand-logo">
+    <img src="cashflow-mascote.png" alt="Cash Flow IA" class="brand-logo">
+    <span class="brand-name">Cash Flow IA</span>
   </div>
   <a href="#preco" class="nav-btn">Começar agora →</a>
 </nav>
@@ -352,7 +355,7 @@ footer {
       <div class="phone-notch"><div class="phone-notch-pill"></div></div>
       <div class="phone-header">
         <div class="phone-avatar">
-          <img src="cashflow-logo.png" alt="Cash Flow IA">
+          <img src="cashflow-mascote.png" alt="Cash Flow IA">
         </div>
         <div>
           <div class="phone-name">Cash Flow IA</div>
@@ -477,7 +480,7 @@ footer {
       <div class="testi-stars">★★★★★</div>
       <p class="testi-text">"Tentei de tudo: planilha, app, caderno. Só o Cash Flow IA funcionou de verdade. Levei menos de 2 minutos pra entender como usar."</p>
       <div class="testi-author">
-        <div class="testi-avatar">👨‍💼</div>
+        <div class="testi-avatar"><img src="depo-empresario.jpg" alt="João S."></div>
         <div>
           <div class="testi-name">João S.</div>
           <div class="testi-role">Empresário · São Paulo</div>
@@ -488,7 +491,7 @@ footer {
       <div class="testi-stars">★★★★★</div>
       <p class="testi-text">"Em duas semanas descobri que estava gastando quase R$ 400 por mês em delivery sem perceber. Agora reduzi pra menos de R$ 150."</p>
       <div class="testi-author">
-        <div class="testi-avatar">👩‍🏫</div>
+        <div class="testi-avatar"><img src="depo-professora.jpg" alt="Letícia M."></div>
         <div>
           <div class="testi-name">Letícia M.</div>
           <div class="testi-role">Professora · Florianópolis</div>
@@ -499,7 +502,7 @@ footer {
       <div class="testi-stars">★★★★★</div>
       <p class="testi-text">"Uso pra registrar tudo: gastos do negócio, despesas pessoais, até pix recebido. Organizado, rápido e sem complicação."</p>
       <div class="testi-author">
-        <div class="testi-avatar">👨‍🔧</div>
+        <div class="testi-avatar"><img src="depo-autonomo.jpg" alt="Rafael C."></div>
         <div>
           <div class="testi-name">Rafael C.</div>
           <div class="testi-role">Autônomo · Curitiba</div>
@@ -586,7 +589,7 @@ footer {
 </section>
 
 <footer>
-  <p>© 2025 Cash Flow IA · Todos os direitos reservados</p>
+  <p>© 2026 Cash Flow IA · Todos os direitos reservados</p>
 </footer>
 
 <!-- BOTÃO FIXO -->
