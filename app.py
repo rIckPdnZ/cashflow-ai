@@ -1,6 +1,6 @@
 """
 ╔══════════════════════════════════════════════════════════════╗
-║              Cash Flow IA — WhatsApp Bot v3.1                ║
+║              Cash Flow IA — WhatsApp Bot v3.3                ║
 ║         Flask · Evolution API · Groq · PostgreSQL            ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Variáveis de ambiente obrigatórias:                         ║
@@ -10,18 +10,26 @@
 ║    EVOLUTION_KEY      → apikey configurada no .env           ║
 ║    EVOLUTION_INSTANCE → nome da instância (ex: cashflow)     ║
 ║    PORT               → (opcional) padrão 5000               ║
+║  Opcionais:                                                  ║
+║    WEBHOOK_SECRET     → exige ?token=... na URL do webhook   ║
+║    GROQ_MODEL         → padrão llama-3.1-8b-instant          ║
+║    LOG_LEVEL          → padrão INFO (DEBUG mostra payloads)  ║
 ╚══════════════════════════════════════════════════════════════╝
 """
 
 import os
 import re
+import hmac
 import json
+import math
 import base64
 import random
 import hashlib
 import logging
+import threading
+import unicodedata
 import requests
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from calendar import monthrange
 
 import psycopg2
@@ -29,22 +37,68 @@ import psycopg2.extras
 from flask import Flask, request
 from groq import Groq
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+_nivel_log = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), None)
+logging.basicConfig(
+    level=_nivel_log if isinstance(_nivel_log, int) else logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 log = logging.getLogger("cashflow")
 
 app = Flask(__name__)
 
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")
 DATABASE_URL = os.environ["DATABASE_URL"]
 
 EVOLUTION_URL = os.environ["EVOLUTION_URL"].rstrip("/")
 EVOLUTION_KEY = os.environ["EVOLUTION_KEY"]
 EVOLUTION_INSTANCE = os.environ["EVOLUTION_INSTANCE"]
 
-groq_client = Groq(api_key=GROQ_API_KEY)
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+
+if not WEBHOOK_SECRET:
+    log.warning("WEBHOOK_SECRET nao definido: o /webhook aceita requisicoes de qualquer origem.")
+
+# Timeout curto e 1 retry: uma IA lenta nao pode travar o worker do gunicorn.
+groq_client = Groq(api_key=GROQ_API_KEY, timeout=12, max_retries=1)
+
+# O servidor roda em UTC; o "hoje" do usuario e o de Brasilia.
+try:
+    from zoneinfo import ZoneInfo
+    FUSO = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    FUSO = timezone(timedelta(hours=-3))  # Brasilia nao tem horario de verao desde 2019
+
+_local = threading.local()
+
+
+def hoje() -> date:
+    return datetime.now(FUSO).date()
+
+
+def http() -> requests.Session:
+    # Uma sessao por thread: reaproveita a conexao com a Evolution entre mensagens.
+    if not hasattr(_local, "sessao"):
+        _local.sessao = requests.Session()
+    return _local.sessao
+
+
+def mascarar(telefone: str) -> str:
+    numero = re.sub(r"\D", "", telefone.split("@")[0])
+    return "***" + numero[-4:]
+
+
+def sem_acento(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", texto) if not unicodedata.combining(c))
+
+
+# Indice do payload que a Evolution aceitou por ultimo (v1 usa textMessage, v2 usa text).
+_formato_envio = 0
 
 
 def enviar(telefone: str, texto: str):
+    global _formato_envio
+
     numero = telefone.replace("@s.whatsapp.net", "").replace("@c.us", "")
 
     url = f"{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}"
@@ -67,17 +121,27 @@ def enviar(telefone: str, texto: str):
         }
     ]
 
-    for payload in payloads:
+    # Tenta primeiro o formato que funcionou da ultima vez: 1 requisicao em vez de 2.
+    ordem = sorted(range(len(payloads)), key=lambda i: i != _formato_envio)
+    erro = None
+
+    for i in ordem:
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=15)
-            log.info("EVOLUTION SEND STATUS %s: %s", r.status_code, r.text[:500])
-
-            if r.status_code < 400:
-                return True
-
+            r = http().post(url, json=payloads[i], headers=headers, timeout=10)
         except requests.RequestException as e:
-            log.error("Falha ao enviar mensagem para %s: %s", telefone, e)
+            erro = e
+            continue
 
+        if r.status_code < 400:
+            if i != _formato_envio:
+                log.info("Evolution: usando o formato de envio %s", i)
+                _formato_envio = i
+            log.debug("EVOLUTION SEND STATUS %s: %s", r.status_code, r.text[:500])
+            return True
+
+        erro = "status {}: {}".format(r.status_code, r.text[:300])
+
+    log.error("Falha ao enviar mensagem para %s: %s", mascarar(telefone), erro)
     return False
 
 
@@ -91,14 +155,39 @@ def fmt_sinal(valor: float) -> str:
 
 
 def dias_restantes_mes() -> int:
-    hoje = date.today()
-    ultimo = monthrange(hoje.year, hoje.month)[1]
-    return ultimo - hoje.day
+    # Conta o dia de hoje: no ultimo dia do mes ainda resta 1 dia, nao 0.
+    h = hoje()
+    ultimo = monthrange(h.year, h.month)[1]
+    return ultimo - h.day + 1
+
+
+_tabelas_prontas = False
+_tabelas_lock = threading.Lock()
 
 
 def get_conn():
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    global _tabelas_prontas
+
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=10)
+
+    # Cria as tabelas uma vez por processo, e nao a cada conexao.
+    if not _tabelas_prontas:
+        with _tabelas_lock:
+            if not _tabelas_prontas:
+                try:
+                    criar_tabelas(conn)
+                except Exception:
+                    conn.close()
+                    raise
+                _tabelas_prontas = True
+
+    return conn
+
+
+def criar_tabelas(conn):
     with conn.cursor() as cur:
+        # Evita dois workers criando as mesmas tabelas ao mesmo tempo num banco novo.
+        cur.execute("SELECT pg_advisory_xact_lock(727274)")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS transacoes (
                 id SERIAL PRIMARY KEY,
@@ -122,11 +211,20 @@ def get_conn():
             ON transacoes (telefone, data)
         """)
     conn.commit()
-    return conn
 
 
+# Se mudar id_curto(), mude tambem o left(md5(id::text), 6) de SQL_POR_ID_CURTO.
 def id_curto(pk: int) -> str:
     return hashlib.md5(str(pk).encode()).hexdigest()[:6]
+
+
+SQL_POR_ID_CURTO = """
+    SELECT id, descricao, valor, tipo, categoria
+    FROM transacoes
+    WHERE telefone=%s AND left(md5(id::text), 6)=%s
+    ORDER BY id DESC
+    LIMIT 1
+"""
 
 
 def salvar_transacao(telefone, descricao, valor, tipo, categoria):
@@ -139,7 +237,7 @@ def salvar_transacao(telefone, descricao, valor, tipo, categoria):
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (telefone, descricao, valor, tipo, categoria, date.today())
+                (telefone, descricao, valor, tipo, categoria, hoje())
             )
             pk = cur.fetchone()["id"]
         conn.commit()
@@ -165,16 +263,8 @@ def editar_transacao(telefone, short_id, novo_valor, nova_desc, usar_ultimo=Fals
                 )
                 row = cur.fetchone()
             else:
-                cur.execute(
-                    """
-                    SELECT id, descricao, valor, tipo, categoria
-                    FROM transacoes
-                    WHERE telefone=%s
-                    """,
-                    (telefone,)
-                )
-                rows = cur.fetchall()
-                row = next((r for r in rows if id_curto(r["id"]) == short_id.lower()), None)
+                cur.execute(SQL_POR_ID_CURTO, (telefone, (short_id or "").lower()))
+                row = cur.fetchone()
 
             if not row:
                 return None
@@ -225,16 +315,8 @@ def apagar_transacao(telefone, short_id=None, usar_ultimo=False):
                 )
                 row = cur.fetchone()
             else:
-                cur.execute(
-                    """
-                    SELECT id, descricao, valor, tipo
-                    FROM transacoes
-                    WHERE telefone=%s
-                    """,
-                    (telefone,)
-                )
-                rows = cur.fetchall()
-                row = next((r for r in rows if id_curto(r["id"]) == short_id.lower()), None)
+                cur.execute(SQL_POR_ID_CURTO, (telefone, (short_id or "").lower()))
+                row = cur.fetchone()
 
             if not row:
                 return None
@@ -296,17 +378,17 @@ def salvar_limite(telefone, valor):
 
 
 def periodo_hoje():
-    h = date.today()
+    h = hoje()
     return h, h
 
 
 def periodo_semana():
-    h = date.today()
+    h = hoje()
     return h - timedelta(days=h.weekday()), h
 
 
 def periodo_mes():
-    h = date.today()
+    h = hoje()
     return h.replace(day=1), h
 
 
@@ -366,10 +448,115 @@ Entrada: Salario|Freela|Investimentos|Vendas|Transferencia|Outros
 SOMENTE JSON."""
 
 
+INTENCOES = {
+    "gasto", "resumo", "hoje", "extrato", "relatorio", "semana", "saldo", "top", "posso_gastar",
+    "limite", "editar", "apagar", "dica", "ajuda", "oi", "confirmacao", "duvida", "outro",
+    "erro",  # interna: a API da IA falhou
+}
+
+CATEGORIAS = [
+    "Alimentacao", "Transporte", "Lazer", "Saude", "Moradia", "Educacao", "Beleza e Cuidados", "Roupas",
+    "Servicos", "Investimentos", "Salario", "Freela", "Vendas", "Transferencia", "Outros",
+]
+
+_CATEGORIA_POR_CHAVE = {c.lower(): c for c in CATEGORIAS}
+
+# Acima disso e erro de leitura, nao um lancamento (e estouraria o NUMERIC(12,2)).
+VALOR_MAXIMO = 1_000_000_000
+
+
+def normalizar_categoria(categoria) -> str:
+    # "Alimentação", "alimentacao" e "Alimentacao" sao a mesma categoria no extrato.
+    nome = str(categoria or "").strip()
+    if not nome:
+        return "Outros"
+    return _CATEGORIA_POR_CHAVE.get(sem_acento(nome).lower(), nome)
+
+
+def para_valor(valor) -> float:
+    # A IA as vezes manda texto: "85,90", "1.234,56", "R$ 50". Invalido vira 0.
+    if isinstance(valor, bool):
+        return 0.0
+
+    if isinstance(valor, (int, float)):
+        try:
+            numero = float(valor)
+        except OverflowError:
+            return 0.0
+    else:
+        texto = re.sub(r"[^\d,.-]", "", str(valor or ""))
+
+        if "," in texto and "." in texto:
+            if texto.rfind(",") > texto.rfind("."):
+                texto = texto.replace(".", "").replace(",", ".")  # 1.234,56
+            else:
+                texto = texto.replace(",", "")  # 1,234.56
+        elif re.fullmatch(r"-?\d{1,3}(\.\d{3})+", texto):
+            texto = texto.replace(".", "")  # 1.500 = mil e quinhentos
+        else:
+            texto = texto.replace(",", ".")
+
+        try:
+            numero = float(texto)
+        except ValueError:
+            return 0.0
+
+    numero = abs(numero)
+
+    if not math.isfinite(numero) or numero >= VALOR_MAXIMO:
+        return 0.0
+
+    return round(numero, 2)
+
+
+def normalizar_ia(dados: dict) -> dict:
+    # IAs pequenas mandam null, "Gasto", "saída", "posso gastar"... aqui tudo vira o formato esperado.
+    intencao = sem_acento(str(dados.get("intencao") or "outro")).strip().lower().replace(" ", "_")
+    tipo = sem_acento(str(dados.get("tipo") or "saida")).strip().lower()
+
+    return {
+        "intencao": intencao if intencao in INTENCOES else "outro",
+        "descricao": str(dados.get("descricao") or "").strip(),
+        "valor": para_valor(dados.get("valor")),
+        "tipo": tipo if tipo in ("entrada", "saida") else "saida",
+        "categoria": normalizar_categoria(dados.get("categoria")),
+    }
+
+
+# Comandos exatos (os da _ajuda_) nao precisam da IA: resposta mais rapida e sem erro de interpretacao.
+ATALHOS = {
+    "saldo": "saldo",
+    "extrato": "extrato",
+    "extrato completo": "extrato",
+    "mes": "relatorio",
+    "relatorio": "relatorio",
+    "relatorio do mes": "relatorio",
+    "relatorio mensal": "relatorio",
+    "semana": "semana",
+    "relatorio semanal": "semana",
+    "hoje": "hoje",
+    "resumo": "resumo",
+    "top": "top",
+    "ajuda": "ajuda",
+    "comandos": "ajuda",
+    "help": "ajuda",
+    "dica": "dica",
+    "dicas": "dica",
+    "posso gastar": "posso_gastar",
+    "quanto posso gastar": "posso_gastar",
+}
+
+
+def atalho(mensagem: str):
+    chave = " ".join(re.sub(r"[^\w\s]", " ", sem_acento(mensagem).lower()).split())
+    intencao = ATALHOS.get(chave)
+    return normalizar_ia({"intencao": intencao}) if intencao else None
+
+
 def chamar_ia(mensagem: str) -> dict:
     try:
         res = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model=GROQ_MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": mensagem}
@@ -377,8 +564,12 @@ def chamar_ia(mensagem: str) -> dict:
             temperature=0.15,
             max_tokens=200
         )
+    except Exception as e:
+        log.error("Erro na API da IA: %s", e)
+        return normalizar_ia({"intencao": "erro"})
 
-        raw = res.choices[0].message.content.strip()
+    try:
+        raw = (res.choices[0].message.content or "").strip()
         raw = re.sub(r"```json|```", "", raw).strip()
 
         match = re.search(r"\{.*\}", raw, re.DOTALL)
@@ -386,54 +577,34 @@ def chamar_ia(mensagem: str) -> dict:
         if not match:
             raise ValueError("Sem JSON na resposta: {}".format(raw))
 
-        data = json.loads(match.group())
-
-        data.setdefault("intencao", "outro")
-        data.setdefault("descricao", mensagem)
-        data.setdefault("valor", 0.0)
-        data.setdefault("tipo", "saida")
-        data.setdefault("categoria", "Outros")
-
-        return data
+        return normalizar_ia(json.loads(match.group()))
 
     except Exception as e:
-        log.error("Erro IA: %s", e)
-        return {
-            "intencao": "outro",
-            "descricao": mensagem,
-            "valor": 0.0,
-            "tipo": "saida",
-            "categoria": "Outros"
-        }
+        log.error("Resposta invalida da IA: %s", e)
+        return normalizar_ia({})
 
 
 EMOJI_CAT = {
     "alimentacao": "🍔",
-    "alimentação": "🍔",
     "transporte": "🚗",
     "lazer": "🎮",
     "saude": "💊",
-    "saúde": "💊",
     "moradia": "🏠",
     "educacao": "📚",
-    "educação": "📚",
     "roupas": "👕",
     "beleza e cuidados": "💅",
     "servicos": "🔧",
-    "serviços": "🔧",
     "investimentos": "📈",
     "salario": "💼",
-    "salário": "💼",
     "freela": "💻",
     "vendas": "🛍️",
     "transferencia": "📲",
-    "transferência": "📲",
     "outros": "📦",
 }
 
 
 def ecat(cat):
-    return EMOJI_CAT.get(cat.lower(), "📦")
+    return EMOJI_CAT.get(sem_acento(cat).lower(), "📦")
 
 
 def barra(porc, n=10):
@@ -508,7 +679,7 @@ def relatorio_extrato(titulo, label_ini, label_fim, txs, limite=0.0):
 
     for t in txs:
         if t["tipo"] == "saida":
-            cats.setdefault(t["categoria"], []).append(t)
+            cats.setdefault(normalizar_categoria(t["categoria"]), []).append(t)
 
     linhas = [
         "🧾 *{}*".format(titulo),
@@ -588,7 +759,7 @@ def relatorio_top(telefone, n=5):
     linhas = ["🏆 *Top {} maiores saidas do mes:*\n".format(min(n, len(saidas)))]
 
     for i, t in enumerate(saidas[:n], 1):
-        linhas.append("{}. {} — {}  ({})".format(i, t["descricao"].capitalize(), fmt(float(t["valor"])), t["categoria"]))
+        linhas.append("{}. {} — {}  ({})".format(i, t["descricao"].capitalize(), fmt(float(t["valor"])), normalizar_categoria(t["categoria"])))
 
     return "\n".join(linhas)
 
@@ -614,14 +785,15 @@ def relatorio_posso_gastar(telefone):
             "Segura os gastos ate o fim do mes! 💪"
         ).format(fmt(abs(rest)), fmt(limite))
 
-    por_dia = rest / dias if dias > 0 else rest
+    por_dia = rest / dias
+    prazo = "ultimo dia do mes" if dias == 1 else "{} dias restantes".format(dias)
 
     return (
         "💰 *Voce ainda pode gastar:*\n\n"
         "*{}* ate o fim do mes\n"
-        "_(aprox. {} por dia, {} dias restantes)_\n\n"
+        "_(aprox. {} por dia, {})_\n\n"
         "Baseado no seu limite de {}"
-    ).format(fmt(rest), fmt(por_dia), dias, fmt(limite))
+    ).format(fmt(rest), fmt(por_dia), prazo, fmt(limite))
 
 
 def relatorio_hoje_resumo(telefone):
@@ -629,7 +801,7 @@ def relatorio_hoje_resumo(telefone):
     txs = buscar_transacoes(telefone, ini, fim)
     ent, sai, sal = totais(txs)
     emoji = "🟢" if sal >= 0 else "🔴"
-    hoje_str = date.today().strftime("%d/%m")
+    hoje_str = hoje().strftime("%d/%m")
 
     if not txs:
         return "Hoje ({})\n\nNenhuma movimentacao ainda.".format(hoje_str)
@@ -698,19 +870,59 @@ PALAVRAS_BEM_VINDO = {
 }
 
 
+# Palavras que nao identificam o lancamento em "apagar o ultimo gasto do mercado".
+PALAVRAS_COMANDO = {
+    "apagar", "apaga", "apague", "excluir", "exclui", "exclua", "deletar", "deleta", "delete",
+    "remover", "remove", "remova", "editar", "edita", "edite", "alterar", "altera", "altere",
+    "corrigir", "corrige", "corrija", "mudar", "muda", "mude", "trocar", "troca", "troque",
+    "ultimo", "ultima", "last", "lancamento", "gasto", "registro", "valor", "entrada", "saida",
+    "o", "a", "os", "as", "um", "uma", "do", "da", "dos", "das", "de", "no", "na", "para", "pra", "pro",
+    "meu", "minha", "id",
+}
+
+
+def extrair_id(texto: str):
+    # ID curto do extrato (6 hex). Numa frase, exige um digito: "decada" nao e ID.
+    t = texto.strip().lower()
+    if re.fullmatch(r"[a-f0-9]{6}", t):
+        return t
+    m = re.search(r"\b(?=[a-f]*\d)[a-f0-9]{6}\b", t)
+    return m.group(0) if m else None
+
+
+def termo_busca(texto: str) -> str:
+    # "apagar o ultimo mercado 50" -> "mercado"
+    t = re.sub(r"\b\d+(?:[.,]\d+)*\b", " ", sem_acento(texto).lower())
+    return " ".join(p for p in re.findall(r"\w+", t) if p not in PALAVRAS_COMANDO)
+
+
+def buscar_por_descricao(telefone, termo):
+    # Lancamento mais recente do mes cuja descricao contem o termo.
+    ini, fim = periodo_mes()
+    txs = buscar_transacoes(telefone, ini, fim)
+    matches = [t for t in txs if termo in sem_acento(t["descricao"]).lower()]
+    return matches[-1] if matches else None
+
+
 def extrair_mensagem(data: dict):
     try:
-        log.info("PAYLOAD RAW: %s", json.dumps(data, ensure_ascii=False)[:4000])
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("PAYLOAD RAW: %s", json.dumps(data, ensure_ascii=False)[:4000])
 
         if isinstance(data, dict) and data.get("base64"):
             decoded = base64.b64decode(data["base64"]).decode("utf-8")
             data = json.loads(decoded)
-            log.info("PAYLOAD BASE64 DECODIFICADO: %s", json.dumps(data, ensure_ascii=False)[:4000])
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug("PAYLOAD BASE64 DECODIFICADO: %s", json.dumps(data, ensure_ascii=False)[:4000])
 
         event = str(data.get("event", "")).lower()
-        log.info("EVENTO: %s", event)
+        log.debug("EVENTO: %s", event)
 
         if event and ("message" not in event and "messages" not in event):
+            return None, None
+
+        # Historico sincronizado ao reconectar o WhatsApp: mensagens antigas, nao registrar de novo.
+        if event in ("messages.set", "messages_set"):
             return None, None
 
         msg_data = data.get("data", {})
@@ -763,6 +975,13 @@ def extrair_mensagem(data: dict):
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    # Com WEBHOOK_SECRET definido, so aceita a URL configurada na Evolution: /webhook?token=SEGREDO
+    if WEBHOOK_SECRET and not hmac.compare_digest(
+        request.args.get("token", "").encode(), WEBHOOK_SECRET.encode()
+    ):
+        log.warning("Webhook recusado: token invalido ou ausente.")
+        return "", 401
+
     data = request.get_json(silent=True) or {}
 
     telefone, mensagem = extrair_mensagem(data)
@@ -770,7 +989,8 @@ def webhook():
     if not telefone or not mensagem:
         return "", 200
 
-    log.info("MSG %s: %s", telefone, mensagem)
+    log.info("MSG de %s (%s caracteres)", mascarar(telefone), len(mensagem))
+    log.debug("MSG %s: %s", telefone, mensagem)
 
     msg_limpa = mensagem.lower().strip()
 
@@ -779,16 +999,15 @@ def webhook():
         return "", 200
 
     try:
-        r = chamar_ia(mensagem)
+        r = atalho(mensagem) or chamar_ia(mensagem)
 
-        intencao = r.get("intencao", "outro")
-        valor = float(r.get("valor") or 0)
-        tipo = r.get("tipo", "saida").strip().lower()
-        descricao = r.get("descricao", mensagem).strip().capitalize()
-        categoria = r.get("categoria", "Outros").strip()
+        intencao = r["intencao"]
+        valor = r["valor"]
+        tipo = r["tipo"]
+        descricao = (r["descricao"] or mensagem).capitalize()
+        categoria = r["categoria"]
 
-        if tipo not in ("entrada", "saida"):
-            tipo = "saida"
+        log.info("Intencao: %s", intencao)
 
         if intencao == "gasto":
             if valor <= 0:
@@ -827,7 +1046,7 @@ def webhook():
         elif intencao == "hoje":
             ini, fim = periodo_hoje()
             txs = buscar_transacoes(telefone, ini, fim)
-            label = date.today().strftime("%d/%m/%Y")
+            label = ini.strftime("%d/%m/%Y")
             enviar(telefone, relatorio_resumo("Hoje — {}".format(label), txs))
 
         elif intencao == "semana":
@@ -892,24 +1111,21 @@ def webhook():
                 enviar(telefone, "🤖 Informe o valor. Ex: _limite 2000_")
 
         elif intencao == "editar":
-            desc_raw = r.get("descricao", "").strip().lower()
+            # Sem descricao da IA, usa a mensagem sem o valor novo do final ("editar mercado 120").
+            alvo = r["descricao"] or re.sub(r"\s*\d+(?:[.,]\d+)?\s*$", "", mensagem)
             novo_val = valor if valor > 0 else None
-            usar_ultimo = desc_raw in ("ultimo", "último", "")
-            short_id = None
+            short_id = extrair_id(alvo)
+            termo = "" if short_id else termo_busca(alvo)
+            usar_ultimo = not short_id and not termo
 
-            if not usar_ultimo:
-                if re.match(r"^[a-f0-9]{6}$", desc_raw):
-                    short_id = desc_raw
-                else:
-                    ini, fim = periodo_mes()
-                    txs = buscar_transacoes(telefone, ini, fim)
-                    matches = [t for t in txs if desc_raw in t["descricao"].lower()]
+            if termo:
+                achado = buscar_por_descricao(telefone, termo)
 
-                    if matches:
-                        short_id = id_curto(matches[-1]["id"])
-                    else:
-                        enviar(telefone, "🤖 Nao achei _{}_ este mes.\n\nUse o ID do extrato: _editar ae3f06 120_".format(desc_raw))
-                        return "", 200
+                if not achado:
+                    enviar(telefone, "🤖 Nao achei _{}_ este mes.\n\nUse o ID do extrato: _editar ae3f06 120_".format(termo))
+                    return "", 200
+
+                short_id = id_curto(achado["id"])
 
             if novo_val is None:
                 enviar(telefone, "✏️ Qual o novo valor?\n\nEx: _editar ultimo 120_")
@@ -929,7 +1145,7 @@ def webhook():
                     "✏️ *Lancamento atualizado!*\n\n{} → {}\n🏷️ {} `{}`".format(
                         updated["descricao"].capitalize(),
                         fmt(float(updated["valor"])),
-                        updated["categoria"],
+                        normalizar_categoria(updated["categoria"]),
                         id_curto(updated["id"])
                     )
                 )
@@ -937,13 +1153,23 @@ def webhook():
                 enviar(telefone, "🤖 Nao encontrei esse lancamento. Confere o ID no extrato.")
 
         elif intencao == "apagar":
-            msg_lower = mensagem.lower()
-            usar_ultimo = any(p in msg_lower for p in ("ultimo", "último", "last"))
-            hex_match = re.search(r"\b([a-f0-9]{6})\b", msg_lower)
-            short_id = hex_match.group(1) if hex_match else None
+            usar_ultimo = bool(re.search(r"\b(ultimo|ultima|last)\b", sem_acento(mensagem).lower()))
+            short_id = extrair_id(r["descricao"]) or extrair_id(mensagem)
 
             if not usar_ultimo and not short_id:
-                usar_ultimo = True
+                # "apagar mercado" apaga o mercado, nunca outro lancamento no lugar.
+                termo = termo_busca(r["descricao"] or mensagem)
+
+                if termo:
+                    achado = buscar_por_descricao(telefone, termo)
+
+                    if not achado:
+                        enviar(telefone, "🤖 Nao achei _{}_ este mes.\n\nUse o ID do extrato: _apagar ae3f06_".format(termo))
+                        return "", 200
+
+                    short_id = id_curto(achado["id"])
+                else:
+                    usar_ultimo = True
 
             deleted = apagar_transacao(telefone, short_id=short_id, usar_ultimo=usar_ultimo)
 
@@ -987,6 +1213,9 @@ def webhook():
         elif intencao == "ajuda":
             enviar(telefone, MSG_AJUDA)
 
+        elif intencao == "erro":
+            enviar(telefone, "🤖 Tive um problema tecnico pra ler sua mensagem. Manda de novo em instantes!")
+
         else:
             enviar(
                 telefone,
@@ -1006,7 +1235,7 @@ def webhook():
 
 @app.route("/", methods=["GET"])
 def health():
-    return {"status": "ok", "app": "Cash Flow IA", "version": "3.2"}, 200
+    return {"status": "ok", "app": "Cash Flow IA", "version": "3.3"}, 200
 
 
 if __name__ == "__main__":
