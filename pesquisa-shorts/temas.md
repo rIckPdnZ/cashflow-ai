@@ -87,3 +87,9 @@ Legenda de qualidade da inspeção: **[V-ferramenta]** = análise visual do vidI
 - Ref YT: Fluxero volleyball 1,02M (isolada; evidência limitada).
 - Recomendados [V-ferramenta]: oobekkaoo (vôlei de praia, 0:00-0:02), viralvideovisualsvvv0 (escorrega no estúdio, 0:05-0:07), gerryplaysbeach IG (bola atinge espectadora, 0:04-0:05), espn tênis (truque, 0:10-0:12; planejado), amandaharnett IG (bola em chamas; planejado, original aparente).
 - Risco/direitos: espnw (tela de transmissão, lesão). Descartados: jynxzir6 (sem momento), itsschloebennett (encenado).
+
+## T16. Falhas ao volante — INCOMPLETO (fraca em clipes originais seguros)
+- Refs YT: CallMeRR 'Craziest Driving Fails' 32,0M (54k subs; 394x; isolada mas muito forte), AESTHETIC Video 1,55M. Refs fracas: WISHAUTO, The vault (~25k).
+- Aproveitáveis [V-ferramenta]: houseofhighlights (para-brisa trincado, 0:08-0:20; repost com crédito IG connorirwin_98/benparker_98 — achar originais), lostwondersai (SUV afunda na rampa; verificar autenticidade), funnyx.clips007 (caçamba arrancada; spam/encenação possível).
+- Descartados: failarmy (licenciado Jukin), aiko.asia (encenado), dashcam (sem momento).
+- Pendência: originais dos criadores do para-brisa; clipes de dashcam com momento forte.
