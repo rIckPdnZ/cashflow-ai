@@ -78,3 +78,5 @@ Fila: T6 slipping (em análise) -> T7 football -> T8 wedding -> T9 parkour -> T1
 - T15 sports fails (volleyball etc.; ref YT Fluxero volleyball 1,02M): busca #21; 8 análises submetidas.
 - Tema 15 sports fails FECHADO: viável c/ ressalvas. Acumulado: buscas TikTok/IG=21, análises=104, YT=12. Próxima: T16 driving fails; T17 basketball; T18 school; T19 monkeys/zoo; depois relatório final.
 - T16 driving fails: busca #22 + YT #13; 6 análises (0 falhas). INCOMPLETO. Acumulado: buscas TikTok/IG=22, análises=110, YT=13. Próxima: T17 basketball não-NBA/streetball; T18 school; T19 monkeys/zoo; T20 reaction; depois relatório final.
+- T17 basketball: busca #23 só metadados; pool = ligas (direitos). INCOMPLETO. Acumulado: buscas=23, análises=110, YT=13. Próxima: T18 monkeys/zoo; T19 school; T20 reaction.
+- T18 monkeys: YT #14 + busca #24; 7 análises (1 pendente: withjanaworld job_f739c936). INCOMPLETO (demanda forte). Acumulado: buscas=24, análises=117, YT=14. Próxima: T19 school moments; T20 reaction; depois relatório final.

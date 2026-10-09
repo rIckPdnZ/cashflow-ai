@@ -93,3 +93,13 @@ Legenda de qualidade da inspeção: **[V-ferramenta]** = análise visual do vidI
 - Aproveitáveis [V-ferramenta]: houseofhighlights (para-brisa trincado, 0:08-0:20; repost com crédito IG connorirwin_98/benparker_98 — achar originais), lostwondersai (SUV afunda na rampa; verificar autenticidade), funnyx.clips007 (caçamba arrancada; spam/encenação possível).
 - Descartados: failarmy (licenciado Jukin), aiko.asia (encenado), dashcam (sem momento).
 - Pendência: originais dos criadores do para-brisa; clipes de dashcam com momento forte.
+
+## T17. Basketball (fora da NBA) — DESCARTADO/INCOMPLETO (direitos)
+- Refs YT fortes (Tier5 15,0M; Domix 3,1M) mas o pool TikTok/IG é quase todo de ligas profissionais (NBA/WNBA/G League): risco de direitos igual ao T7. Sem análise visual (economia de créditos). Leads [Meta]: osozus (montagem de cestas falhas), andscape (tropeço de A'ja, sensível).
+- Pendência: se retomar, buscar streetball/rec-league/escola com criadores próprios.
+
+## T18. Funny monkey moments — INCOMPLETO (demanda YT forte; oferta de clipes seguros fraca)
+- Refs YT: Rankfloy 6,40M (100k subs); tellorankings Pt.4 2,59M (série até Pt.15); RankMonkey 1,74M/1,54M; RenShortz 1,69M; NANCY FAN 23 1,38M = 5+ canais (evidência forte; concorrência alta, série numerada é padrão).
+- Aproveitáveis [V-ferramenta]: dexthemonkey (pelúcia, ciúmes; criador original; encenado), thetoledozoo (girafa atrapalha o foco; fonte do zoo), thaboandray (macaco pet no banheiro; mordida).
+- Descartados: syedburhanrizvi (possível IA), gibbon007, nayana (sem momento). Pool em geral dominado por pets exóticos/provocação de animais (ética, risco de reputação).
+- Pendência: withjanaworld (macaco insistente) ainda sem retorno; buscar 'macacos roubam turistas' com criadores originais.
