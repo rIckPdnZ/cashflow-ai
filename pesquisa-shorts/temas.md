@@ -76,3 +76,14 @@ Legenda de qualidade da inspeção: **[V-ferramenta]** = análise visual do vidI
 - Recomendados [V-ferramenta]: town.and.gown (bartender sacode 4 shakers dançando, 0:03-0:07), ken_dent901 (empilhadeira em 2 rodas, 0:01-0:03; clipe original a achar), forklifther0 (moeda no USB-C, 0:11-0:14; cortar), a_shtifanov (flair, 0:11-0:14; marca do artista), bleucalgary (0:02-0:06).
 - Descartados: manuela.preis (sem momento forte), garretshafer, kt.fabricates (113s).
 - Vantagem: criadores profissionais postam o próprio material (contato direto para permissão é possível).
+
+## T14. Funny dog moments — INCOMPLETO (evidência YT fraca; poucos clipes fortes)
+- Refs YT: só 'Ranking Funniest Dog Dance Moments' (Rankilius 3,78M; 39k subs; 1829x) é forte (isolada); 'Ranking Funniest Dog Moments' genérico: ~30k (5 canais pequenos). Evidência limitada.
+- Aproveitáveis [V-ferramenta]: ewep_0 (cão traz laje de pedra, 0:10-0:13), brinkleybusiness (cão escorrega e escala, 0:11-0:15; longo), pippathepyrenees (ignora a bola, 0:01-0:04; sutil).
+- Descartados: ezrahoefsmit (filhote em perigo), lisatheblacklab (estático), muitos virais dependem de voiceover/IA (ai__masterpiece___, grimtheozzy).
+- Pendência: buscar 'dog dance' (3,78M) e testar se os clipes são reais ou IA.
+
+## T15. Falhas esportivas (vôlei/tênis/estúdio) — VIÁVEL COM RESSALVAS (4–5 clipes; quase todos reposts)
+- Ref YT: Fluxero volleyball 1,02M (isolada; evidência limitada).
+- Recomendados [V-ferramenta]: oobekkaoo (vôlei de praia, 0:00-0:02), viralvideovisualsvvv0 (escorrega no estúdio, 0:05-0:07), gerryplaysbeach IG (bola atinge espectadora, 0:04-0:05), espn tênis (truque, 0:10-0:12; planejado), amandaharnett IG (bola em chamas; planejado, original aparente).
+- Risco/direitos: espnw (tela de transmissão, lesão). Descartados: jynxzir6 (sem momento), itsschloebennett (encenado).

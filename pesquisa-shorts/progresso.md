@@ -72,3 +72,8 @@ Fila: T6 slipping (em análise) -> T7 football -> T8 wedding -> T9 parkour -> T1
 - Tema 13 workers FECHADO: viável com ressalvas. Acumulado etapa: buscas TikTok/IG=19, análises=91 (6 falhas), YT=12.
 - Viáveis: T2*, T3, T4, T5, T8*, T9*, T12*, T13* (8). Incompletos: T1, T6, T7, T10, T11.
 - Próxima ação: gravar relatorio.md parcial + commit/push; depois T14 driving, T15 ball sports fails (volleyball), T16 dog moments, T17 school moments, T18 basketball (não-NBA).
+- T14 dogs: busca #20; 5 análises submetidas (ref YT dog dance Rankilius 3,78M/dog moments genérico fraco).
+- T14 dogs FECHADO como INCOMPLETO. Acumulado etapa: buscas TikTok/IG=20, análises=96 (6 falhas), YT=12.
+- Próxima ação: T15 driving fails; T16 volleyball/ball sports fails; T17 basketball (não NBA)/streetball; T18 school moments; T19 monkeys/zoo animals; T20 'reaction to unexpected' — depois relatório final.
+- T15 sports fails (volleyball etc.; ref YT Fluxero volleyball 1,02M): busca #21; 8 análises submetidas.
+- Tema 15 sports fails FECHADO: viável c/ ressalvas. Acumulado: buscas TikTok/IG=21, análises=104, YT=12. Próxima: T16 driving fails; T17 basketball; T18 school; T19 monkeys/zoo; depois relatório final.
