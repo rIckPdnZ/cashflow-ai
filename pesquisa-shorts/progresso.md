@@ -80,3 +80,6 @@ Fila: T6 slipping (em análise) -> T7 football -> T8 wedding -> T9 parkour -> T1
 - T16 driving fails: busca #22 + YT #13; 6 análises (0 falhas). INCOMPLETO. Acumulado: buscas TikTok/IG=22, análises=110, YT=13. Próxima: T17 basketball não-NBA/streetball; T18 school; T19 monkeys/zoo; T20 reaction; depois relatório final.
 - T17 basketball: busca #23 só metadados; pool = ligas (direitos). INCOMPLETO. Acumulado: buscas=23, análises=110, YT=13. Próxima: T18 monkeys/zoo; T19 school; T20 reaction.
 - T18 monkeys: YT #14 + busca #24; 7 análises (1 pendente: withjanaworld job_f739c936). INCOMPLETO (demanda forte). Acumulado: buscas=24, análises=117, YT=14. Próxima: T19 school moments; T20 reaction; depois relatório final.
+- T19 school: YT #15 + busca #25 só metadados; INCOMPLETO (menores/direitos). Acumulado: buscas=25, análises=117, YT=15. Dois temas seguidos sem análises (T17,T19) -> próxima: temas com oferta mais limpa (dança, neve/gelo, trampolim).
+- T20 trampolim: YT #16 + busca #26; 4 análises; INCOMPLETO. withjanaworld (T18) resolvido: descartado. Acumulado: buscas=26, análises=121, YT=16.
+- RELATÓRIO FINAL gravado (relatorio.md). Etapa encerrada: 9 viáveis, 11 incompletos/descartados; saldo vidIQ 6.035 créditos. Ponto de retomada na seção 8 do relatório.

@@ -103,3 +103,13 @@ Legenda de qualidade da inspeção: **[V-ferramenta]** = análise visual do vidI
 - Aproveitáveis [V-ferramenta]: dexthemonkey (pelúcia, ciúmes; criador original; encenado), thetoledozoo (girafa atrapalha o foco; fonte do zoo), thaboandray (macaco pet no banheiro; mordida).
 - Descartados: syedburhanrizvi (possível IA), gibbon007, nayana (sem momento). Pool em geral dominado por pets exóticos/provocação de animais (ética, risco de reputação).
 - Pendência: withjanaworld (macaco insistente) ainda sem retorno; buscar 'macacos roubam turistas' com criadores originais.
+
+## T19. School moments — INCOMPLETO (demanda YT muito forte; oferta TikTok/IG inadequada)
+- Refs YT: 6+ canais com 0,87M–4,34M (Hanzo 4,34M; rya 3,27M; NetCrate 2,59M; CallMecaptainR 1,92M; ZupRank 1,36M; Overanalyzed 1,20M): evidência forte.
+- Problema: clipes reais de escola envolvem menores (excluídos por critério de segurança) e o pool é de esquetes/cenas de séries (direitos). Sem análise visual.
+- Pendência/ideia: variante 'college/professor/formatura' com adultos, ou 'teacher fails' com criadores adultos.
+
+## T20. Trampolim / saltos falhos — INCOMPLETO (poucos clipes seguros)
+- Refs YT: RankDrish 1,82M (isolada; demais ~20-30k). Singing fails 7,53M (J.Broncano) anotado, não explorado.
+- Recomendados [V-ferramenta]: brittanyobrienn (prancha, 0:03-0:09; criadora adulta), mannyfreshtok11 (bloco do trampolim, 0:01-0:05; ressalva de lesão). Promissor: fitnessbarbiemma (narração problemática).
+- Descartado: houseofhighlights (menor de idade). Pool dominado por crianças e compilações.
